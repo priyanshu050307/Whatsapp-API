@@ -254,11 +254,46 @@ function healMissingCredits(resolve, reject) {
           if (histErr) {
             logger.error('Failed to log healed credits in history: %s', histErr.message);
           }
-          resolve();
+          cleanAlphanumericChannelIds(resolve, reject);
         }
       );
     }
   );
+}
+
+function cleanAlphanumericChannelIds(resolve, reject) {
+  db.all("SELECT tenant_id, channel_id FROM tenants", [], (err, rows) => {
+    if (err) {
+      logger.error('Failed to query tenants for channel_id check: %s', err.message);
+      return resolve();
+    }
+
+    let updatesPending = 0;
+    let completedUpdates = 0;
+
+    rows.forEach(row => {
+      const cid = String(row.channel_id).trim();
+      const isNumeric = /^\d+$/.test(cid);
+      if (!isNumeric || cid.length > 8) {
+        updatesPending++;
+        const newCid = String(Math.floor(10000000 + Math.random() * 90000000));
+        logger.info(`Migrating alphanumeric/invalid channel_id "${cid}" for tenant "${row.tenant_id}" to numeric: "${newCid}"`);
+        db.run("UPDATE tenants SET channel_id = ? WHERE tenant_id = ?", [newCid, row.tenant_id], (updateErr) => {
+          if (updateErr) {
+            logger.error(`Failed to update channelId for tenant "${row.tenant_id}": %s`, updateErr.message);
+          }
+          completedUpdates++;
+          if (completedUpdates === updatesPending) {
+            resolve();
+          }
+        });
+      }
+    });
+
+    if (updatesPending === 0) {
+      resolve();
+    }
+  });
 }
 
 // Log message helper
