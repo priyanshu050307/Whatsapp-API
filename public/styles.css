@@ -591,3 +591,93 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ==================== THEME VARIABLES & LIGHT MODE OVERRIDES ==================== */
+:root {
+  --navbar-bg: rgba(9, 13, 22, 0.85);
+  --input-bg: rgba(0, 0, 0, 0.3);
+}
+
+body.light-mode {
+  --bg-color: #f8fafc;
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --border-color: rgba(15, 23, 42, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --glass-shadow: 0 15px 30px 0 rgba(15, 23, 42, 0.06);
+  --navbar-bg: rgba(255, 255, 255, 0.95);
+  --input-bg: rgba(15, 23, 42, 0.03);
+}
+
+body.light-mode {
+  background-color: var(--bg-color) !important;
+  color: var(--text-primary) !important;
+}
+
+body.light-mode .text-light,
+body.light-mode h1,
+body.light-mode h2,
+body.light-mode h3,
+body.light-mode h4,
+body.light-mode h5,
+body.light-mode h6,
+body.light-mode th,
+body.light-mode .navbar-brand span {
+  color: var(--text-primary) !important;
+}
+
+body.light-mode .text-secondary,
+body.light-mode p,
+body.light-mode small,
+body.light-mode label {
+  color: var(--text-secondary) !important;
+}
+
+body.light-mode .form-control {
+  background-color: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+body.light-mode .glass-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+body.light-mode .auth-brand-panel {
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.04) 0%, rgba(255, 255, 255, 0.8) 100%) !important;
+  border-right-color: var(--border-color) !important;
+}
+
+body.light-mode .landing-navbar {
+  background-color: var(--navbar-bg) !important;
+  border-bottom-color: var(--border-color) !important;
+}
+
+body.light-mode .btn-outline-light {
+  color: var(--text-primary) !important;
+  border-color: var(--text-secondary) !important;
+}
+
+body.light-mode .btn-outline-light:hover {
+  background-color: rgba(15, 23, 42, 0.05) !important;
+}
+
+body.light-mode .table th, body.light-mode thead th {
+  color: var(--text-primary) !important;
+}
+
+body.light-mode .auth-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+body.light-mode .nav-link {
+  color: var(--text-secondary) !important;
+}
+
+body.light-mode .nav-link.active {
+  color: var(--accent-color) !important;
+}

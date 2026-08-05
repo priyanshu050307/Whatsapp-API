@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initApp() {
+  initTheme();
   setupEventListeners();
   initGoogleAuth();
 
@@ -318,6 +319,41 @@ function handleContactSubmit(event) {
     resultDiv.innerHTML = '<span class="text-success fs-7 fw-semibold"><i class="bi bi-check-circle-fill me-1"></i> Thank you! Your inquiry was sent successfully.</span>';
   }
   event.target.reset();
+}
+
+/* ==================== THEME MANAGEMENT LOGIC ==================== */
+function initTheme() {
+  const theme = localStorage.getItem('wa_gateway_theme') || 'dark';
+  if (theme === 'light') {
+    document.body.classList.add('light-mode');
+    updateThemeToggleIcons('light');
+  } else {
+    document.body.classList.remove('light-mode');
+    updateThemeToggleIcons('dark');
+  }
+}
+
+function toggleTheme() {
+  if (document.body.classList.contains('light-mode')) {
+    document.body.classList.remove('light-mode');
+    localStorage.setItem('wa_gateway_theme', 'dark');
+    updateThemeToggleIcons('dark');
+  } else {
+    document.body.classList.add('light-mode');
+    localStorage.setItem('wa_gateway_theme', 'light');
+    updateThemeToggleIcons('light');
+  }
+}
+
+function updateThemeToggleIcons(theme) {
+  const icons = document.querySelectorAll('.theme-toggle-icon');
+  icons.forEach(icon => {
+    if (theme === 'light') {
+      icon.className = 'bi bi-moon-fill theme-toggle-icon';
+    } else {
+      icon.className = 'bi bi-sun-fill theme-toggle-icon';
+    }
+  });
 }
 
 
@@ -1265,6 +1301,16 @@ function setupEventListeners() {
   const landingContactForm = document.getElementById('landingContactForm');
   if (landingContactForm) {
     landingContactForm.onsubmit = handleContactSubmit;
+  }
+
+  // Theme Toggle click handlers
+  const btnThemeToggleLanding = document.getElementById('btnThemeToggleLanding');
+  if (btnThemeToggleLanding) {
+    btnThemeToggleLanding.onclick = toggleTheme;
+  }
+  const btnThemeToggleDashboard = document.getElementById('btnThemeToggleDashboard');
+  if (btnThemeToggleDashboard) {
+    btnThemeToggleDashboard.onclick = toggleTheme;
   }
 
   // Listen for hash change to switch login views dynamically
