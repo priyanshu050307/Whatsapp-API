@@ -298,6 +298,12 @@ function showAuthOverlay() {
 }
 
 function openLoginOverlay() {
+  const clientLoginView = document.getElementById('clientLoginView');
+  const adminLoginView = document.getElementById('adminLoginView');
+  if (clientLoginView && adminLoginView) {
+    clientLoginView.style.display = 'block';
+    adminLoginView.style.display = 'none';
+  }
   document.getElementById('authOverlay').style.display = 'flex';
 }
 
