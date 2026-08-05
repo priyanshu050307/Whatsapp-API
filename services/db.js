@@ -457,7 +457,7 @@ function createGoogleTenant(googleData) {
 
   const username = `u_${crypto.randomBytes(4).toString('hex')}`;
   const password = crypto.randomBytes(8).toString('hex');
-  const channelId = `ch_${crypto.randomBytes(4).toString('hex')}`;
+  const channelId = String(Math.floor(10000000 + Math.random() * 90000000));
 
   return addTenant(tenantId, username, password, channelId, {
     email,

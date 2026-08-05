@@ -238,6 +238,15 @@ exports.registerTenant = async (req, res) => {
     });
   }
 
+  // Validate that channelId is numeric and at most 8 digits for Busy integration compatibility
+  const isNumeric = /^\d+$/.test(String(channelId).trim());
+  if (!isNumeric || String(channelId).trim().length > 8) {
+    return res.status(400).json({
+      status: 'failed',
+      reason: 'Validation Error: channelId must be a numeric value of at most 8 digits.'
+    });
+  }
+
   try {
     const success = await db.addTenant(tenantId, username, password, channelId);
     if (!success) {

@@ -158,4 +158,56 @@ describe('=== Admin Actions Endpoint Testing ===', () => {
       deleteStub.restore();
     });
   });
+
+  describe('7. System Tenant Registration Validation', () => {
+    it('should successfully register tenant with valid numeric channelId of at most 8 digits', async () => {
+      const initStub = sinon.stub(whatsappService, 'initClient').returns();
+
+      const response = await request(app)
+        .post('/api/tenants')
+        .set('x-admin-password', 'admin123')
+        .send({
+          tenantId: 'reg_valid_tenant',
+          username: 'valid_user',
+          password: 'valid_password',
+          channelId: '12345678'
+        });
+
+      expect(response.status).to.equal(201);
+      expect(response.body).to.have.property('status', 'success');
+      initStub.restore();
+    });
+
+    it('should reject registration if channelId is non-numeric', async () => {
+      const response = await request(app)
+        .post('/api/tenants')
+        .set('x-admin-password', 'admin123')
+        .send({
+          tenantId: 'reg_invalid_tenant_1',
+          username: 'invalid_user_1',
+          password: 'invalid_password_1',
+          channelId: 'ch12345'
+        });
+
+      expect(response.status).to.equal(400);
+      expect(response.body).to.have.property('status', 'failed');
+      expect(response.body.reason).to.include('must be a numeric value');
+    });
+
+    it('should reject registration if channelId length is greater than 8 digits', async () => {
+      const response = await request(app)
+        .post('/api/tenants')
+        .set('x-admin-password', 'admin123')
+        .send({
+          tenantId: 'reg_invalid_tenant_2',
+          username: 'invalid_user_2',
+          password: 'invalid_password_2',
+          channelId: '123456789'
+        });
+
+      expect(response.status).to.equal(400);
+      expect(response.body).to.have.property('status', 'failed');
+      expect(response.body.reason).to.include('at most 8 digits');
+    });
+  });
 });
