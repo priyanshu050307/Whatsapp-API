@@ -1245,6 +1245,28 @@ async function adminDeleteClientAccount(tenantId, email) {
 /* ==================== EVENT LISTENERS & UI HELPERS ==================== */
 
 function setupEventListeners() {
+  // Bind landing page Sign In, Close, and Contact form actions dynamically (CSP compliant)
+  const btnLandingSignIn = document.getElementById('btnLandingSignIn');
+  if (btnLandingSignIn) {
+    btnLandingSignIn.onclick = openLoginOverlay;
+  }
+  const btnHeroTrial = document.getElementById('btnHeroTrial');
+  if (btnHeroTrial) {
+    btnHeroTrial.onclick = openLoginOverlay;
+  }
+  const btnAboutGetStarted = document.getElementById('btnAboutGetStarted');
+  if (btnAboutGetStarted) {
+    btnAboutGetStarted.onclick = openLoginOverlay;
+  }
+  const btnAuthClose = document.getElementById('btnAuthClose');
+  if (btnAuthClose) {
+    btnAuthClose.onclick = closeLoginOverlay;
+  }
+  const landingContactForm = document.getElementById('landingContactForm');
+  if (landingContactForm) {
+    landingContactForm.onsubmit = handleContactSubmit;
+  }
+
   // Listen for hash change to switch login views dynamically
   window.addEventListener('hashchange', () => {
     if (!state.token) {

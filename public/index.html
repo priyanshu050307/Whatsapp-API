@@ -32,7 +32,7 @@
             <i class="bi bi-whatsapp text-success fs-3"></i>
             <span>WaGateway</span>
           </a>
-          <button class="btn btn-success btn-success-glow btn-sm px-3 py-2 fw-semibold fs-8" onclick="openLoginOverlay()">
+          <button id="btnLandingSignIn" class="btn btn-success btn-success-glow btn-sm px-3 py-2 fw-semibold fs-8">
             <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
           </button>
         </div>
@@ -69,7 +69,7 @@
           The ultimate multi-tenant messaging gateway. Seamlessly integrate with Busy Accounting Software, Tally, or custom APIs to send bulk invoices, alerts, and notifications instantly with natural anti-spam delays.
         </p>
         <div class="d-flex justify-content-center gap-3 flex-wrap">
-          <button class="btn btn-success btn-lg px-4 py-3 fw-bold fs-7 shadow-lg" onclick="openLoginOverlay()">
+          <button id="btnHeroTrial" class="btn btn-success btn-lg px-4 py-3 fw-bold fs-7 shadow-lg">
             Start 15-Day Free Trial <i class="bi bi-arrow-right ms-1"></i>
           </button>
           <a href="#features" class="btn btn-outline-light btn-lg px-4 py-3 fw-bold fs-7">
@@ -182,7 +182,7 @@
               <div class="position-relative z-1">
                 <h5 class="fw-bold text-light mb-2">Host on Your Subdomain</h5>
                 <p class="text-secondary fs-7 mb-4">You can easily host and run your custom instance of WaGateway on your subdomain (like wa.toolcab.in) and bind it directly to your business apps.</p>
-                <button class="btn btn-outline-success btn-sm px-4 py-2 fw-semibold fs-7" onclick="openLoginOverlay()">Get Started Now</button>
+                <button id="btnAboutGetStarted" class="btn btn-outline-success btn-sm px-4 py-2 fw-semibold fs-7">Get Started Now</button>
               </div>
             </div>
           </div>
@@ -199,7 +199,7 @@
           <p class="text-secondary fs-7 mt-2">Have questions about integrations or enterprise plans? Write to us.</p>
         </div>
         <div class="card glass-card p-4 p-md-5">
-          <form id="landingContactForm" onsubmit="handleContactSubmit(event)">
+          <form id="landingContactForm">
             <div class="row g-3">
               <div class="col-md-6">
                 <label for="contactName" class="form-label fs-7 text-secondary fw-medium">Your Name</label>
@@ -247,7 +247,7 @@
     <div class="auth-wrapper container py-3 py-md-4 position-relative">
       
       <!-- CLOSE BUTTON -->
-      <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-4 fs-8" onclick="closeLoginOverlay()" aria-label="Close" style="z-index: 1060;"></button>
+      <button type="button" id="btnAuthClose" class="btn-close btn-close-white position-absolute end-0 top-0 m-4 fs-8" aria-label="Close" style="z-index: 1060;"></button>
 
       <div class="card auth-card glass-card border-0 shadow-lg overflow-hidden mx-auto">
         <div class="row g-0">
