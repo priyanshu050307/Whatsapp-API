@@ -273,7 +273,11 @@ function showAuthOverlay() {
     state.socket.disconnect();
     state.socket = null;
   }
-  document.getElementById('authOverlay').style.display = 'flex';
+  
+  // Show the landing page by default
+  const landingPage = document.getElementById('landingPage');
+  if (landingPage) landingPage.style.display = 'block';
+
   document.getElementById('mainApp').style.display = 'none';
 
   // Toggle admin/client login view based on the URL path or hash
@@ -282,19 +286,41 @@ function showAuthOverlay() {
   if (clientLoginView && adminLoginView) {
     const isAdminUrl = window.location.pathname === '/admin' || window.location.hash === '#admin' || window.location.hash === '#admin-login';
     if (isAdminUrl) {
+      document.getElementById('authOverlay').style.display = 'flex';
       clientLoginView.style.display = 'none';
       adminLoginView.style.display = 'block';
     } else {
+      document.getElementById('authOverlay').style.display = 'none';
       clientLoginView.style.display = 'block';
       adminLoginView.style.display = 'none';
     }
   }
 }
 
+function openLoginOverlay() {
+  document.getElementById('authOverlay').style.display = 'flex';
+}
+
+function closeLoginOverlay() {
+  document.getElementById('authOverlay').style.display = 'none';
+}
+
+function handleContactSubmit(event) {
+  event.preventDefault();
+  const resultDiv = document.getElementById('contactFormResult');
+  if (resultDiv) {
+    resultDiv.innerHTML = '<span class="text-success fs-7 fw-semibold"><i class="bi bi-check-circle-fill me-1"></i> Thank you! Your inquiry was sent successfully.</span>';
+  }
+  event.target.reset();
+}
+
 
 /* ==================== CLIENT DASHBOARD & REAL-TIME SOCKET ==================== */
 
 async function showClientDashboard() {
+  const landingPage = document.getElementById('landingPage');
+  if (landingPage) landingPage.style.display = 'none';
+
   document.getElementById('authOverlay').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
   document.getElementById('clientDashboardView').style.display = 'block';
@@ -840,6 +866,9 @@ async function sendWaWebMessage() {
 /* ==================== MASTER ADMIN DASHBOARD LOGIC ==================== */
 
 async function showAdminDashboard() {
+  const landingPage = document.getElementById('landingPage');
+  if (landingPage) landingPage.style.display = 'none';
+
   document.getElementById('authOverlay').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
   document.getElementById('clientDashboardView').style.display = 'none';
