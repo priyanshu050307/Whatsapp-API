@@ -681,3 +681,20 @@ body.light-mode .nav-link {
 body.light-mode .nav-link.active {
   color: var(--accent-color) !important;
 }
+
+body.light-mode section,
+body.light-mode .bg-black,
+body.light-mode .bg-dark {
+  background-color: var(--bg-color) !important;
+}
+
+body.light-mode #features,
+body.light-mode #contact {
+  background-color: #f8fafc !important; /* Pure clean light mode background */
+  border-color: var(--border-color) !important;
+}
+
+body.light-mode footer {
+  background-color: var(--bg-color) !important;
+  border-top-color: var(--border-color) !important;
+}
