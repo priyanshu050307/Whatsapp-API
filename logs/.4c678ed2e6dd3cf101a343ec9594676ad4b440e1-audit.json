@@ -1,0 +1,25 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\G.E.N.I.U.S\\WhatsApp (1)\\logs\\.4c678ed2e6dd3cf101a343ec9594676ad4b440e1-audit.json",
+    "files": [
+        {
+            "date": 1785679101079,
+            "name": "C:\\G.E.N.I.U.S\\WhatsApp (1)\\logs\\app-2026-08-02.log",
+            "hash": "a5e36edaf98407a81865901e4618ef0b0b0cb111ea85ee8ec0d6a5b35e0e9434"
+        },
+        {
+            "date": 1785781867160,
+            "name": "C:\\G.E.N.I.U.S\\WhatsApp (1)\\logs\\app-2026-08-04.log",
+            "hash": "974c0d4377eaaf4bb732eac80e17c19b19b8d40248c11c4f1ba2aaea16e0c0c6"
+        },
+        {
+            "date": 1785914429446,
+            "name": "C:\\G.E.N.I.U.S\\WhatsApp (1)\\logs\\app-2026-08-05.log",
+            "hash": "fe699372cfed46504c18deaa15742ab4bc1fdc5140ba54b32c423109107cce5e"
+        }
+    ],
+    "hashType": "sha256"
+}

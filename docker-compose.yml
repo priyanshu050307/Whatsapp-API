@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  whatsapp-gateway:
+    build: .
+    container_name: whatsapp_gateway
+    restart: always
+    ports:
+      - "3005:3005"
+    volumes:
+      - gateway_session_data:/usr/src/app/session
+      - gateway_logs_data:/usr/src/app/logs
+    environment:
+      - PORT=3005
+      - NODE_ENV=production
+      - MASTER_ADMIN_PASSWORD=master_admin_pass
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  gateway_session_data:
+  gateway_logs_data:

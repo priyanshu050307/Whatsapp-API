@@ -1,0 +1,9 @@
+{
+  "ignore": [
+    "session/*",
+    "logs/*",
+    "node_modules/*",
+    "public/*"
+  ],
+  "ext": "js,json"
+}

@@ -1,0 +1,467 @@
+:root {
+  --bg-color: #090d16;
+  --card-bg: rgba(15, 23, 42, 0.85);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-color: #10b981;
+  --danger-color: #ef4444;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+  --glass-shadow: 0 20px 40px 0 rgba(0, 0, 0, 0.5);
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding-bottom: 2rem;
+}
+
+/* Glassmorphism Cards */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  transition: all 0.25s ease-in-out;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-indicator.ready {
+  background-color: var(--accent-color);
+  box-shadow: 0 0 10px var(--accent-color);
+}
+
+.status-indicator.loading, .status-indicator.connecting {
+  background-color: var(--warning-color);
+  box-shadow: 0 0 10px var(--warning-color);
+  animation: pulse 1.5s infinite;
+}
+
+.status-indicator.disconnected {
+  background-color: var(--danger-color);
+  box-shadow: 0 0 10px var(--danger-color);
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.6; }
+}
+
+/* QR Code Container */
+.qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  background: rgba(10, 15, 26, 0.7);
+  border-radius: 16px;
+  border: 1px dashed var(--border-color);
+  padding: 1.25rem;
+}
+
+.qr-image {
+  max-width: 200px;
+  border-radius: 10px;
+  border: 4px solid #ffffff;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+/* App logo badge */
+.app-logo-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Custom button glows */
+.btn-success-glow {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+}
+
+.btn-success-glow:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+}
+
+.btn-danger-glow {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);
+}
+
+.btn-danger-glow:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+}
+
+.fs-7 { font-size: 0.875rem; }
+.fs-8 { font-size: 0.775rem; }
+.fw-mono { font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ==================== ZOHO INVENTORY INSPIRED SAAS AUTH STYLES ==================== */
+#authOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 30%, #0f172a 0%, #090d16 100%);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 1.5rem 0;
+}
+
+.auth-wrapper {
+  max-width: 960px;
+  width: 100%;
+}
+
+.auth-card {
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+}
+
+.auth-brand-panel {
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.6) 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auth-tabs-nav button {
+  transition: all 0.2s ease-in-out;
+}
+
+.auth-tabs-nav button.active-admin {
+  background: #f59e0b !important;
+  color: #0f172a !important;
+  border: none !important;
+}
+
+.auth-tabs-nav button.active-client {
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.feature-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.form-control:focus {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.input-group-text {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* ==================== WHATSAPP LIVE WEB INTERFACE STYLES ==================== */
+.wa-qr-overlay {
+  z-index: 100 !important;
+}
+.wa-qr-overlay.show {
+  display: flex !important;
+}
+.wa-qr-overlay.d-none {
+  display: none !important;
+}
+
+.wa-web-wrapper {
+  height: 650px;
+  background: rgba(11, 20, 26, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.wa-sidebar {
+  background: #111b21;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.wa-sidebar-header {
+  padding: 12px 16px;
+  background: #202c33;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wa-search-box {
+  padding: 10px 14px;
+  background: #111b21;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wa-chat-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.wa-chat-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease;
+}
+
+.wa-chat-item:hover {
+  background: #202c33;
+}
+
+.wa-chat-item.active {
+  background: #2a3942;
+}
+
+.wa-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.wa-unread-badge {
+  background: #25d366;
+  color: #111b21;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.wa-main-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0b141a;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  position: relative;
+}
+
+.wa-chat-header {
+  padding: 10px 20px;
+  background: #202c33;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  z-index: 10;
+}
+
+.wa-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wa-msg-bubble {
+  max-width: 65%;
+  padding: 8px 12px 6px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.wa-msg-incoming {
+  background: #202c33;
+  color: #e9edef;
+  align-self: flex-start;
+  border-top-left-radius: 0;
+}
+
+.wa-msg-outgoing {
+  background: #005c4b;
+  color: #e9edef;
+  align-self: flex-end;
+  border-top-right-radius: 0;
+}
+
+.wa-msg-time {
+  font-size: 10px;
+  color: rgba(241, 241, 241, 0.6);
+  float: right;
+  margin-left: 10px;
+  margin-top: 4px;
+}
+
+.wa-input-bar {
+  padding: 12px 16px;
+  background: #202c33;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wa-input-field {
+  background: #2a3942;
+  border: none;
+  color: #e9edef;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  resize: none;
+}
+
+.wa-input-field:focus {
+  background: #2a3942;
+  color: #fff;
+  box-shadow: none;
+  outline: none;
+}
+
+.wa-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #8696a0;
+  text-align: center;
+  padding: 30px;
+}
+
+/* ==================== HIGH CONTRAST & PREMIUM UI IMPROVEMENTS ==================== */
+
+/* Ensure all input values and selects have extremely bright, high-contrast, off-white text */
+.form-control, .form-select, .wa-input-field {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  color: #f8fafc !important; /* highly visible off-white text */
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.form-control::placeholder, .wa-input-field::placeholder {
+  color: #64748b !important; /* slate placeholder text */
+}
+
+/* Custom Badges for Premium SaaS look and feel and High Contrast */
+.badge {
+  font-weight: 600 !important;
+  letter-spacing: 0.02em;
+  padding: 0.35em 0.65em !important;
+  border-radius: 6px !important;
+  text-shadow: none !important;
+}
+
+/* Explicit high contrast text and border colors for status badges */
+.bg-success.bg-opacity-20, .bg-success.bg-opacity-10, .bg-success.bg-opacity-15 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important; /* light emerald text */
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+
+.bg-info.bg-opacity-20, .bg-info.bg-opacity-25 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  color: #60a5fa !important; /* light blue text */
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+}
+
+.bg-danger.bg-opacity-20, .bg-danger.bg-opacity-10 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important; /* light red text */
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+
+.bg-warning.bg-opacity-20, .bg-warning.bg-opacity-10 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important; /* light amber text */
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Ensure text color utility classes are bright and readable on dark themes */
+.text-success {
+  color: #34d399 !important;
+}
+.text-info {
+  color: #60a5fa !important;
+}
+.text-danger {
+  color: #f87171 !important;
+}
+.text-warning {
+  color: #fbbf24 !important;
+}
+
+/* Make table headers slightly brighter for visibility */
+.table th, thead th {
+  color: #cbd5e1 !important;
+}
+
+/* Better table row hover effect */
+.table-hover tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}

@@ -1,0 +1,21 @@
+# Node dependencies
+node_modules/
+
+# Local configuration
+.env
+
+# WhatsApp Session Cache (highly private!)
+session/
+.wwebjs_cache/
+.wwebjs_auth/
+
+# Database files and raw logs
+logs/*.db
+logs/*.db-journal
+logs/*.log
+logs/*.jsonl
+logs/test_database*.db
+
+# OS files
+.DS_Store
+Thumbs.db
