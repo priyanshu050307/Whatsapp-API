@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "mocha tests/**/*.test.js --timeout 15000 --exit"
+    "test": "mocha tests/**/*.test.js --timeout 15000 --exit",
+    "update:whatsapp": "node scripts/update-whatsapp.js",
+    "update:whatsapp:check": "node scripts/update-whatsapp.js --check",
+    "update:whatsapp:pm2": "node scripts/update-whatsapp.js --reload"
   },
   "keywords": [
     "whatsapp",

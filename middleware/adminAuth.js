@@ -1,5 +1,13 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const config = require('../config/config');
+
+function safeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
 
 /**
  * Admin Authentication Middleware
@@ -9,11 +17,11 @@ const config = require('../config/config');
  */
 module.exports = (req, res, next) => {
   const activeConfig = config.get();
-  const expectedAdminPassword = activeConfig.MASTER_ADMIN_PASSWORD || 'admin123';
+  const expectedAdminPassword = String(activeConfig.MASTER_ADMIN_PASSWORD || 'admin123').trim();
 
-  // 1. Check x-admin-password header
+  // 1. Check x-admin-password header (constant-time comparison)
   const adminPasswordHeader = req.headers['x-admin-password'] || (req.body && req.body.adminPassword);
-  if (adminPasswordHeader && adminPasswordHeader.toString().trim() === expectedAdminPassword.toString().trim()) {
+  if (adminPasswordHeader && safeCompare(String(adminPasswordHeader).trim(), expectedAdminPassword)) {
     req.isAdmin = true;
     return next();
   }

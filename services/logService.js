@@ -5,6 +5,17 @@ const path = require('path');
 
 const memoryLogsMap = new Map(); // tenantId -> Array of logs
 const MAX_MEMORY_LOGS = 100;
+const logsDir = path.resolve(__dirname, '../logs');
+
+function getSafeLogFilePath(tenantId) {
+  const safeId = String(tenantId || 'default').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safeId) throw new Error('Invalid tenantId for log file');
+  const resolved = path.resolve(logsDir, `messages_${safeId}.jsonl`);
+  if (!resolved.startsWith(logsDir + path.sep)) {
+    throw new Error('Path traversal blocked in logService');
+  }
+  return resolved;
+}
 
 // Helper to get or load memory logs for a tenant
 function getTenantMemoryLogs(tenantId) {
@@ -17,8 +28,8 @@ function getTenantMemoryLogs(tenantId) {
   
   // Load from tenant specific file if SQLite is not available
   if (!db.isAvailable()) {
-    const logFilePath = path.join(__dirname, `../logs/messages_${tenantId}.jsonl`);
     try {
+      const logFilePath = getSafeLogFilePath(tenantId);
       if (fs.existsSync(logFilePath)) {
         const content = fs.readFileSync(logFilePath, 'utf8');
         const lines = content.trim().split('\n').filter(Boolean);
@@ -63,17 +74,20 @@ async function logWhatsAppMessage(tenantId, mobile, message, status, errorMsg = 
     }
 
     // 3. Fallback: Write log entry to JSON Lines backup file
-    const logFilePath = path.join(__dirname, `../logs/messages_${tenantId}.jsonl`);
     try {
+      const logFilePath = getSafeLogFilePath(tenantId);
       fs.appendFileSync(logFilePath, JSON.stringify(logEntry) + '\n', 'utf8');
     } catch (err) {
       logger.error('Failed to append message to messages_%s.jsonl: %s', tenantId, err.message);
     }
   }
 
-  // Log summary to the general Winston system log
+  // Log summary to the general Winston system log and auto-record to client directory
   if (status === 'success') {
     logger.info(`[Tenant: ${tenantId}] WhatsApp Sent Successfully: To=${mobile}, Status=${status}`);
+    db.recordContact(tenantId, mobile, message).catch(err => {
+      logger.debug('Error auto-recording contact: %s', err.message);
+    });
   } else {
     logger.error(`[Tenant: ${tenantId}] WhatsApp Send Failed: To=${mobile}, Status=${status}, Error=${errorMsg}`);
   }

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const systemController = require('../controllers/systemController');
 const authMiddleware = require('../middleware/auth');
+const adminAuth = require('../middleware/adminAuth');
 
 // Legacy administrative endpoints
 router.get('/status', authMiddleware, systemController.getStatus);
@@ -15,10 +16,10 @@ router.get('/api/config', authMiddleware, systemController.getConfig);
 router.post('/api/config', authMiddleware, systemController.saveConfig);
 
 // Tenant registration endpoint (master admin only)
-router.post('/api/tenants', systemController.registerTenant);
+router.post('/api/tenants', adminAuth, systemController.registerTenant);
 
 // Credits Management API Endpoints
-router.post('/api/admin/credits/recharge', systemController.rechargeCredits);
+router.post('/api/admin/credits/recharge', adminAuth, systemController.rechargeCredits);
 router.get('/api/credits/history', authMiddleware, systemController.getRechargeHistory);
 
 const clientController = require('../controllers/clientController');

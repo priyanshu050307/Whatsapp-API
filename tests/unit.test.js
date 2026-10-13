@@ -219,4 +219,36 @@ describe('=== Unit Testing ===', () => {
       expect(next.called).to.be.false;
     });
   });
+
+  describe('4. Automated Update & Self-Healing Engine (services/whatsapp.js & scripts/update-whatsapp.js)', () => {
+    const whatsappService = require('../services/whatsapp');
+    const updater = require('../scripts/update-whatsapp');
+
+    it('should validate legitimate SemVer strings and block shell injection payloads (CWE-78)', () => {
+      expect(updater.isValidSemver('1.34.7')).to.be.true;
+      expect(updater.isValidSemver('1.35.0-alpha.1')).to.be.true;
+      expect(updater.isValidSemver('1.34.7; rm -rf /')).to.be.false;
+      expect(updater.isValidSemver('1.34.7 && whoami')).to.be.false;
+      expect(updater.isValidSemver('$(malicious)')).to.be.false;
+      expect(updater.isValidSemver('')).to.be.false;
+    });
+
+    it('should detect installed whatsapp-web.js version and verify runtime media patch', () => {
+      const installed = updater.getInstalledVersion();
+      expect(installed).to.be.a('string');
+      expect(updater.isValidSemver(installed)).to.be.true;
+      expect(updater.applyMediaPatch()).to.be.true;
+    });
+
+    it('should monitor .wwebjs_cache and expose libraryVersionStatus', () => {
+      const cacheSummary = whatsappService.pruneAndMonitorWWebCache(3);
+      expect(cacheSummary).to.have.property('totalFound').that.is.a('number');
+      expect(cacheSummary.kept).to.be.an('array');
+      expect(cacheSummary.kept.length).to.be.at.most(3);
+
+      const status = whatsappService.getLibraryVersionStatus();
+      expect(status).to.have.property('updateAvailable').that.is.a('boolean');
+      expect(status).to.have.property('cachedWWebVersions').that.is.an('array');
+    });
+  });
 });

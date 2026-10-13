@@ -276,7 +276,7 @@ function cleanAlphanumericChannelIds(resolve, reject) {
       const isNumeric = /^\d+$/.test(cid);
       if (!isNumeric || cid.length > 8) {
         updatesPending++;
-        const newCid = String(Math.floor(10000000 + Math.random() * 90000000));
+        const newCid = String(crypto.randomInt(10000000, 100000000));
         logger.info(`Migrating alphanumeric/invalid channel_id "${cid}" for tenant "${row.tenant_id}" to numeric: "${newCid}"`);
         db.run("UPDATE tenants SET channel_id = ? WHERE tenant_id = ?", [newCid, row.tenant_id], (updateErr) => {
           if (updateErr) {
@@ -284,15 +284,65 @@ function cleanAlphanumericChannelIds(resolve, reject) {
           }
           completedUpdates++;
           if (completedUpdates === updatesPending) {
-            resolve();
+            createCollectedContactsTable(resolve, reject);
           }
         });
       }
     });
 
     if (updatesPending === 0) {
-      resolve();
+      createCollectedContactsTable(resolve, reject);
     }
+  });
+}
+
+function createCollectedContactsTable(resolve, reject) {
+  // 5. Create collected_contacts table for customer base / directory
+  db.run(`
+    CREATE TABLE IF NOT EXISTS collected_contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL,
+      mobile TEXT NOT NULL,
+      total_messages INTEGER DEFAULT 1,
+      last_message TEXT,
+      first_seen_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+      UNIQUE(tenant_id, mobile)
+    )
+  `, (err) => {
+    if (err) {
+      logger.error('Failed to create collected_contacts table: %s', err.message);
+      return reject(err);
+    }
+
+    db.run('CREATE INDEX IF NOT EXISTS idx_contacts_tenant ON collected_contacts(tenant_id)', (idxErr1) => {
+      if (idxErr1) logger.error('Error creating contacts tenant index: %s', idxErr1.message);
+      db.run('CREATE INDEX IF NOT EXISTS idx_contacts_mobile ON collected_contacts(mobile)', (idxErr2) => {
+        if (idxErr2) logger.error('Error creating contacts mobile index: %s', idxErr2.message);
+
+        // Auto-seed/backfill any historical contacts from message_logs
+        db.run(`
+          INSERT OR IGNORE INTO collected_contacts (tenant_id, mobile, total_messages, last_message, first_seen_at, last_seen_at)
+          SELECT 
+            tenant_id, 
+            mobile, 
+            COUNT(*) as total_messages,
+            (SELECT message FROM message_logs m2 WHERE m2.tenant_id = m1.tenant_id AND m2.mobile = m1.mobile ORDER BY id DESC LIMIT 1) as last_message,
+            MIN(created_at) as first_seen_at,
+            MAX(created_at) as last_seen_at
+          FROM message_logs m1
+          WHERE mobile IS NOT NULL AND mobile != ''
+          GROUP BY tenant_id, mobile
+        `, (seedErr) => {
+          if (seedErr) {
+            logger.debug('Contacts seed notice: %s', seedErr.message);
+          }
+          logger.debug('SQLite collected_contacts table initialized and synced successfully.');
+          resolve();
+        });
+      });
+    });
   });
 }
 
@@ -492,7 +542,7 @@ function createGoogleTenant(googleData) {
 
   const username = `u_${crypto.randomBytes(4).toString('hex')}`;
   const password = crypto.randomBytes(8).toString('hex');
-  const channelId = String(Math.floor(10000000 + Math.random() * 90000000));
+  const channelId = String(crypto.randomInt(10000000, 100000000));
 
   return addTenant(tenantId, username, password, channelId, {
     email,
@@ -660,7 +710,8 @@ function getAllClientsWithDetails() {
           COALESCE(c.allocated_credits, 0) as allocated_credits,
           COALESCE(c.used_credits, 0) as used_credits,
           COALESCE(c.remaining_credits, 0) as remaining_credits,
-          (SELECT COUNT(*) FROM message_logs WHERE tenant_id = t.tenant_id AND status = 'success') as total_messages_sent
+          (SELECT COUNT(*) FROM message_logs WHERE tenant_id = t.tenant_id AND status = 'success') as total_messages_sent,
+          (SELECT COUNT(*) FROM collected_contacts WHERE tenant_id = t.tenant_id) as total_contacts_collected
         FROM tenants t
         LEFT JOIN tenant_credits c ON t.tenant_id = c.tenant_id
         ORDER BY t.created_at DESC
@@ -696,35 +747,43 @@ function deleteTenant(tenantId) {
               return resolve(false);
             }
 
-            db.run(`DELETE FROM recharge_history WHERE tenant_id = ?`, [tenantId], (err2) => {
-              if (err2) {
-                logger.error('Error deleting recharge_history: %s', err2.message);
+            db.run(`DELETE FROM collected_contacts WHERE tenant_id = ?`, [tenantId], (errContacts) => {
+              if (errContacts) {
+                logger.error('Error deleting collected_contacts: %s', errContacts.message);
                 db.run('ROLLBACK');
                 return resolve(false);
               }
 
-              db.run(`DELETE FROM tenant_credits WHERE tenant_id = ?`, [tenantId], (err3) => {
-                if (err3) {
-                  logger.error('Error deleting tenant_credits: %s', err3.message);
+              db.run(`DELETE FROM recharge_history WHERE tenant_id = ?`, [tenantId], (err2) => {
+                if (err2) {
+                  logger.error('Error deleting recharge_history: %s', err2.message);
                   db.run('ROLLBACK');
                   return resolve(false);
                 }
 
-                db.run(`DELETE FROM tenants WHERE tenant_id = ?`, [tenantId], function(err4) {
-                  if (err4) {
-                    logger.error('Error deleting tenants record: %s', err4.message);
+                db.run(`DELETE FROM tenant_credits WHERE tenant_id = ?`, [tenantId], (err3) => {
+                  if (err3) {
+                    logger.error('Error deleting tenant_credits: %s', err3.message);
                     db.run('ROLLBACK');
                     return resolve(false);
                   }
 
-                  db.run('COMMIT', (commitErr) => {
-                    if (commitErr) {
-                      logger.error('Failed to commit transaction for tenant deletion: %s', commitErr.message);
+                  db.run(`DELETE FROM tenants WHERE tenant_id = ?`, [tenantId], function(err4) {
+                    if (err4) {
+                      logger.error('Error deleting tenants record: %s', err4.message);
                       db.run('ROLLBACK');
                       return resolve(false);
                     }
-                    logger.info(`[Tenant: ${tenantId}] Transaction committed: Permanently deleted tenant and all associated records.`);
-                    resolve(true);
+
+                    db.run('COMMIT', (commitErr) => {
+                      if (commitErr) {
+                        logger.error('Failed to commit transaction for tenant deletion: %s', commitErr.message);
+                        db.run('ROLLBACK');
+                        return resolve(false);
+                      }
+                      logger.info(`[Tenant: ${tenantId}] Transaction committed: Permanently deleted tenant and all associated records.`);
+                      resolve(true);
+                    });
                   });
                 });
               });
@@ -886,6 +945,103 @@ function getUsageStats(tenantId) {
   return Promise.resolve({ today: 0, month: 0 });
 }
 
+// Contact / Client Directory Management Helpers
+function recordContact(tenantId, mobile, message = '') {
+  if (!sqliteAvailable || !db || !mobile) return Promise.resolve(false);
+  const cleanMobile = String(mobile).replace(/\D/g, '');
+  if (!cleanMobile) return Promise.resolve(false);
+  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+  return new Promise((resolve) => {
+    db.run(
+      `INSERT INTO collected_contacts (tenant_id, mobile, total_messages, last_message, first_seen_at, last_seen_at)
+       VALUES (?, ?, 1, ?, ?, ?)
+       ON CONFLICT(tenant_id, mobile) DO UPDATE SET
+         total_messages = total_messages + 1,
+         last_message = excluded.last_message,
+         last_seen_at = excluded.last_seen_at`,
+      [tenantId, cleanMobile, message ? String(message).substring(0, 300) : '', timestamp, timestamp],
+      function(err) {
+        if (err) {
+          logger.error('Failed to record contact in collected_contacts: %s', err.message);
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      }
+    );
+  });
+}
+
+function getContactsByTenant(tenantId) {
+  if (sqliteAvailable && db) {
+    return new Promise((resolve) => {
+      db.all(
+        `SELECT c.*, t.name as client_name, t.email as client_email, t.username as client_username, t.channel_id as client_channel_id
+         FROM collected_contacts c
+         LEFT JOIN tenants t ON c.tenant_id = t.tenant_id
+         WHERE c.tenant_id = ?
+         ORDER BY c.last_seen_at DESC`,
+        [tenantId],
+        (err, rows) => {
+          if (err) {
+            logger.error('Failed to query contacts for tenant %s: %s', tenantId, err.message);
+            resolve([]);
+          } else {
+            resolve(rows || []);
+          }
+        }
+      );
+    });
+  }
+  return Promise.resolve([]);
+}
+
+function getAllContacts(search = '') {
+  if (sqliteAvailable && db) {
+    return new Promise((resolve) => {
+      let query = `
+        SELECT c.*, t.name as client_name, t.email as client_email, t.username as client_username, t.channel_id as client_channel_id
+        FROM collected_contacts c
+        LEFT JOIN tenants t ON c.tenant_id = t.tenant_id
+      `;
+      const params = [];
+      if (search && search.trim()) {
+        query += ` WHERE c.mobile LIKE ? OR t.name LIKE ? OR t.email LIKE ? OR c.tenant_id LIKE ?`;
+        const s = `%${search.trim()}%`;
+        params.push(s, s, s, s);
+      }
+      query += ` ORDER BY c.last_seen_at DESC`;
+
+      db.all(query, params, (err, rows) => {
+        if (err) {
+          logger.error('Failed to query all contacts: %s', err.message);
+          resolve([]);
+        } else {
+          resolve(rows || []);
+        }
+      });
+    });
+  }
+  return Promise.resolve([]);
+}
+
+function getContactsCountByTenant(tenantId) {
+  if (sqliteAvailable && db) {
+    return new Promise((resolve) => {
+      db.get(
+        `SELECT COUNT(*) as count FROM collected_contacts WHERE tenant_id = ?`,
+        [tenantId],
+        (err, row) => {
+          if (err) resolve(0);
+          else resolve(row ? row.count : 0);
+        }
+      );
+    });
+  }
+  return Promise.resolve(0);
+}
+
 module.exports = {
   init,
   isAvailable: () => sqliteAvailable,
@@ -911,5 +1067,9 @@ module.exports = {
   getRechargeHistory,
   getGlobalRechargeHistory,
   getUsageStats,
+  recordContact,
+  getContactsByTenant,
+  getAllContacts,
+  getContactsCountByTenant,
   get dbInstance() { return db; }
 };

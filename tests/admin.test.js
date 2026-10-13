@@ -210,4 +210,56 @@ describe('=== Admin Actions Endpoint Testing ===', () => {
       expect(response.body.reason).to.include('at most 8 digits');
     });
   });
+
+  describe('8. Contact Directory & Leads Export Validation', () => {
+    const dirTenantId = 'dir_test_tenant';
+
+    before(async () => {
+      await db.addTenant(dirTenantId, 'dir_user', 'dir_pass', '88776655', {
+        email: 'dir_test@example.com',
+        name: 'BUSY User Enterprise'
+      });
+      await db.recordContact(dirTenantId, '919876543210', 'Happy Diwali Greeting Invoice #102');
+      await db.recordContact(dirTenantId, '919876543211', 'Payment Reminder Alert');
+    });
+
+    it('should return contacts JSON list for a respective client', async () => {
+      const response = await request(app)
+        .get(`/api/admin/clients/${dirTenantId}/contacts`)
+        .set('x-admin-password', 'admin123');
+
+      expect(response.status).to.equal(200);
+      expect(response.body).to.have.property('status', 'success');
+      expect(response.body.contacts).to.be.an('array');
+      expect(response.body.totalContacts).to.equal(2);
+      expect(response.body.contacts[0]).to.have.property('mobile');
+    });
+
+    it('should export contacts CSV for the respective client with valid headers and data', async () => {
+      const response = await request(app)
+        .get(`/api/admin/clients/${dirTenantId}/contacts/export`)
+        .set('x-admin-password', 'admin123');
+
+      expect(response.status).to.equal(200);
+      expect(response.headers['content-type']).to.include('text/csv');
+      expect(response.headers['content-disposition']).to.include('attachment');
+      expect(response.headers['content-disposition']).to.include('.csv');
+      expect(response.text).to.include('Mobile Number');
+      expect(response.text).to.include('919876543210');
+      expect(response.text).to.include('Happy Diwali Greeting Invoice #102');
+      expect(response.text).to.include('dir_test@example.com');
+    });
+
+    it('should export all contacts across all clients as CSV', async () => {
+      const response = await request(app)
+        .get('/api/admin/contacts/export')
+        .set('x-admin-password', 'admin123');
+
+      expect(response.status).to.equal(200);
+      expect(response.headers['content-type']).to.include('text/csv');
+      expect(response.headers['content-disposition']).to.include('attachment');
+      expect(response.text).to.include('Mobile Number');
+      expect(response.text).to.include('919876543210');
+    });
+  });
 });

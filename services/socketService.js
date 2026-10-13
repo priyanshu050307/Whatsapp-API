@@ -23,7 +23,7 @@ function init(server) {
 
     try {
       const activeConfig = config.get();
-      const decoded = jwt.verify(token, activeConfig.JWT_SECRET || 'secret');
+      const decoded = jwt.verify(token, activeConfig.JWT_SECRET);
       socket.user = decoded;
       socket.tenantId = decoded.tenantId || decoded.tenant_id;
       if (!socket.tenantId) {

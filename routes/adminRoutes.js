@@ -15,4 +15,9 @@ router.post('/clients/:tenantId/credits', adminController.rechargeCredits);
 router.post('/clients/:tenantId/whatsapp/logout', adminController.logoutClientSession);
 router.delete('/clients/:tenantId', adminController.deleteClientAccount);
 
+// Contact Directory & Leads Export Endpoints
+router.get('/clients/:tenantId/contacts/export', adminController.exportClientContacts);
+router.get('/clients/:tenantId/contacts', adminController.getClientContacts);
+router.get('/contacts/export', adminController.exportAllContacts);
+
 module.exports = router;

@@ -3,7 +3,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const config = require('../config/config');
 
-// Setup Rate Limiting using active settings
+// Setup General API Rate Limiting using active settings
 const activeConfig = config.get();
 const limiter = rateLimit({
   windowMs: activeConfig.RATE_LIMIT_WINDOW_MS || 900000, // default: 15 minutes
@@ -16,19 +16,36 @@ const limiter = rateLimit({
   }
 });
 
+// Strict Rate Limiter for Authentication Endpoints (prevents brute-force attacks)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '25', 10), // max 25 login attempts per 15 min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'failed',
+    reason: 'Too many authentication attempts from this IP. Please try again after 15 minutes.'
+  }
+});
+
 // Configure Cross-Origin Resource Sharing (CORS)
+// Note: 'origin: *' cannot be combined with 'credentials: true' per W3C CORS specification.
+// Since authentication uses Bearer tokens / API headers rather than cookies, credentials is only enabled when a specific origin is configured.
+const configuredOrigin = process.env.CORS_ORIGIN || '*';
 const corsOptions = {
-  origin: '*', // Allows connections from integration software clients
-  methods: ['GET', 'POST', 'OPTIONS'],
+  origin: configuredOrigin,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type', 
     'Authorization', 
+    'X-Access-Token',
+    'X-Admin-Password',
     'X-API-Username', 
     'X-API-Password', 
     'X-API-ChannelID',
     'X-API-Channel-ID'
   ],
-  credentials: true
+  credentials: configuredOrigin !== '*'
 };
 
 // Configure Helmet Security Headers
@@ -40,7 +57,6 @@ const helmetMiddleware = helmet({
       defaultSrc: ["'self'"],
       scriptSrc: [
         "'self'", 
-        "'unsafe-inline'", 
         "https://cdn.jsdelivr.net", 
         "https://www.gstatic.com", 
         "https://apis.google.com",
@@ -63,7 +79,9 @@ const helmetMiddleware = helmet({
         "'self'", 
         "data:", 
         "blob:", 
-        "https://*.googleusercontent.com"
+        "https://*.googleusercontent.com",
+        "https://*.gravatar.com",
+        "https://*.firebasestorage.app"
       ],
       connectSrc: [
         "'self'", 
@@ -72,6 +90,7 @@ const helmetMiddleware = helmet({
         "https://identitytoolkit.googleapis.com", 
         "https://securetoken.googleapis.com", 
         "https://*.firebaseapp.com",
+        "https://*.firebasestorage.app",
         "https://cdn.jsdelivr.net",
         "https://www.gstatic.com",
         "https://apis.google.com",
@@ -82,13 +101,16 @@ const helmetMiddleware = helmet({
         "'self'", 
         "https://*.firebaseapp.com",
         "https://accounts.google.com"
-      ]
+      ],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"]
     }
   }
 });
 
 module.exports = {
   limiter,
+  authLimiter,
   cors: cors(corsOptions),
   helmet: helmetMiddleware
 };

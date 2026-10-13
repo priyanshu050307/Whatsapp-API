@@ -74,16 +74,17 @@ exports.sendMessage = async (req, res) => {
   // 4. Send Message via WhatsApp Service
   try {
     const file = (req.files && req.files.length > 0) ? req.files[0] : null;
-    const result = await whatsappService.sendWhatsAppMessage(tenantId, formattedJID, messageText, file);
     
     // Deduct credit (1 per message sent: 2 if both file and message caption exist, otherwise 1)
     const creditsToDeduct = (file && messageText) ? 2 : 1;
     await db.deductCredit(tenantId, creditsToDeduct);
     
-    // Log success
+    // Log initial message entry
     const logId = await logService.logWhatsAppMessage(tenantId, standardizedMobile, messageText, 'success');
 
-    // Associate the log ID and credits deducted with the queue item for background sending status updates
+    // Send via WhatsApp Service with logId and deductedCredits attached directly
+    const result = await whatsappService.sendWhatsAppMessage(tenantId, formattedJID, messageText, file, logId, creditsToDeduct);
+
     if (result && result.queueItem) {
       result.queueItem.logId = logId;
       result.queueItem.deductedCredits = creditsToDeduct;

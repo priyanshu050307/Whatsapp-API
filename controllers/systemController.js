@@ -26,6 +26,7 @@ exports.getStatus = async (req, res) => {
     pushName: info.pushname,
     platform: info.platform,
     wwebVersion: info.wwebVersion,
+    libraryVersion: whatsappService.getLibraryVersionStatus ? whatsappService.getLibraryVersionStatus() : null,
     serverUptime: uptime,
     pendingQueue: queueLength,
     statsToday: stats,
@@ -35,9 +36,7 @@ exports.getStatus = async (req, res) => {
       remaining: balance ? balance.remaining_credits : 0,
       todayUsage: usageStats ? usageStats.today : 0,
       monthlyUsage: usageStats ? usageStats.month : 0
-    },
-    nodeVersion: process.version,
-    platformOS: process.platform
+    }
   });
 };
 
@@ -101,7 +100,7 @@ exports.logout = async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       status: 'failed',
-      reason: err.message
+      reason: 'Error logging out WhatsApp session'
     });
   }
 };
@@ -121,7 +120,7 @@ exports.restart = async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       status: 'failed',
-      reason: err.message
+      reason: 'Error restarting WhatsApp session'
     });
   }
 };
@@ -141,7 +140,7 @@ exports.getLogs = async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       status: 'failed',
-      reason: err.message
+      reason: 'Failed to retrieve logs'
     });
   }
 };
@@ -192,12 +191,12 @@ exports.saveConfig = async (req, res) => {
   try {
     db.dbInstance.run(
       `UPDATE tenants SET username = ?, password = ?, channel_id = ? WHERE tenant_id = ?`,
-      [API_USERNAME, API_PASSWORD, API_CHANNEL_ID, tenantId],
+      [String(API_USERNAME).trim(), String(API_PASSWORD).trim(), String(API_CHANNEL_ID).trim(), tenantId],
       function(err) {
         if (err) {
           return res.status(500).json({
             status: 'failed',
-            reason: err.message
+            reason: 'Failed to update tenant credentials'
           });
         }
         return res.status(200).json({
@@ -209,20 +208,17 @@ exports.saveConfig = async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       status: 'failed',
-      reason: err.message || 'Failed to update tenant credentials'
+      reason: 'Failed to update tenant credentials'
     });
   }
 };
 
 /**
  * POST /api/tenants
- * Registers a new tenant in the system (master admin only)
+ * Registers a new tenant in the system (master admin only, protected by adminAuth middleware)
  */
 exports.registerTenant = async (req, res) => {
-  const adminPasswordHeader = req.headers['x-admin-password'] || req.body.adminPassword;
-  const expectedAdminPassword = process.env.MASTER_ADMIN_PASSWORD || 'master_admin_pass';
-
-  if (!adminPasswordHeader || adminPasswordHeader.toString() !== expectedAdminPassword.toString()) {
+  if (!req.isAdmin) {
     return res.status(403).json({
       status: 'failed',
       reason: 'Forbidden: Invalid Master Admin Password'
@@ -238,6 +234,14 @@ exports.registerTenant = async (req, res) => {
     });
   }
 
+  // Validate tenantId format to prevent path traversal in session/log file paths
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(String(tenantId).trim())) {
+    return res.status(400).json({
+      status: 'failed',
+      reason: 'Validation Error: tenantId must contain only alphanumeric characters, hyphens, or underscores (max 64 chars).'
+    });
+  }
+
   // Validate that channelId is numeric and at most 8 digits for Busy integration compatibility
   const isNumeric = /^\d+$/.test(String(channelId).trim());
   if (!isNumeric || String(channelId).trim().length > 8) {
@@ -248,7 +252,8 @@ exports.registerTenant = async (req, res) => {
   }
 
   try {
-    const success = await db.addTenant(tenantId, username, password, channelId);
+    const cleanTenantId = String(tenantId).trim();
+    const success = await db.addTenant(cleanTenantId, String(username).trim(), String(password).trim(), String(channelId).trim());
     if (!success) {
       return res.status(409).json({
         status: 'failed',
@@ -257,29 +262,26 @@ exports.registerTenant = async (req, res) => {
     }
 
     // Initialize the WhatsApp Web instance for the new tenant
-    whatsappService.initClient(tenantId);
+    whatsappService.initClient(cleanTenantId);
 
     return res.status(201).json({
       status: 'success',
-      message: `Tenant '${tenantId}' registered successfully. WhatsApp session initialization started in background.`
+      message: `Tenant '${cleanTenantId}' registered successfully. WhatsApp session initialization started in background.`
     });
   } catch (err) {
     return res.status(500).json({
       status: 'failed',
-      reason: err.message || 'Failed to register tenant'
+      reason: 'Failed to register tenant'
     });
   }
 };
 
 /**
  * POST /api/admin/credits/recharge
- * Allocates credits to a tenant (master admin only)
+ * Allocates credits to a tenant (master admin only, protected by adminAuth middleware)
  */
 exports.rechargeCredits = async (req, res) => {
-  const adminPasswordHeader = req.headers['x-admin-password'] || req.body.adminPassword;
-  const expectedAdminPassword = process.env.MASTER_ADMIN_PASSWORD || 'master_admin_pass';
-
-  if (!adminPasswordHeader || adminPasswordHeader.toString() !== expectedAdminPassword.toString()) {
+  if (!req.isAdmin) {
     return res.status(403).json({
       status: 'failed',
       reason: 'Forbidden: Invalid Master Admin Password'
@@ -287,7 +289,7 @@ exports.rechargeCredits = async (req, res) => {
   }
 
   const { tenantId, amount, notes } = req.body;
-  const creditsAmount = parseInt(amount);
+  const creditsAmount = parseInt(amount, 10);
 
   if (!tenantId || isNaN(creditsAmount) || creditsAmount <= 0) {
     return res.status(400).json({
@@ -320,7 +322,7 @@ exports.rechargeCredits = async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       status: 'failed',
-      reason: err.message || 'Failed to recharge credits'
+      reason: 'Failed to recharge credits'
     });
   }
 };

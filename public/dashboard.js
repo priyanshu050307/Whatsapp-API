@@ -697,7 +697,7 @@ function renderWaWebChats(chats) {
       <div class="text-center text-secondary py-4 px-3 fs-8">
         <i class="bi bi-chat-square-dots text-secondary opacity-50 fs-2 mb-2 d-block"></i>
         <p class="mb-2">No recent conversation chats found.</p>
-        <button class="btn btn-sm btn-outline-success px-3 py-1.5 fs-8 fw-medium" onclick="openNewChatPrompt()">
+        <button class="btn btn-sm btn-outline-success px-3 py-1.5 fs-8 fw-medium btn-open-new-chat" type="button">
           <i class="bi bi-plus-lg me-1"></i> Start New Conversation
         </button>
       </div>
@@ -707,14 +707,14 @@ function renderWaWebChats(chats) {
 
   container.innerHTML = filtered.map(chat => {
     const isActive = chat.id === state.activeChatId;
-    const initial = (chat.name || 'C').charAt(0).toUpperCase();
-    const timeStr = chat.timestamp ? formatTimestamp(chat.timestamp) : '';
+    const initial = escapeHtml((chat.name || 'C').charAt(0).toUpperCase());
+    const timeStr = escapeHtml(chat.timestamp ? formatTimestamp(chat.timestamp) : '');
     const lastMsgSnippet = chat.lastMessage ? chat.lastMessage.body : 'No messages yet';
 
     return `
       <div class="wa-chat-item ${isActive ? 'active' : ''}" data-chat-id="${escapeHtml(chat.id)}">
         <div class="wa-avatar me-3">
-          ${chat.profilePic ? `<img src="${chat.profilePic}" class="rounded-circle w-100 h-100" alt="pic">` : initial}
+          ${chat.profilePic ? `<img src="${escapeHtml(chat.profilePic)}" class="rounded-circle w-100 h-100" alt="pic">` : initial}
         </div>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex justify-content-between align-items-center mb-1">
@@ -723,7 +723,7 @@ function renderWaWebChats(chats) {
           </div>
           <div class="d-flex justify-content-between align-items-center">
             <p class="text-secondary fs-8 mb-0 text-truncate" style="max-width: 150px;">${escapeHtml(lastMsgSnippet)}</p>
-            ${chat.unreadCount > 0 ? `<span class="wa-unread-badge ms-1">${chat.unreadCount}</span>` : ''}
+            ${chat.unreadCount > 0 ? `<span class="wa-unread-badge ms-1">${Number(chat.unreadCount)}</span>` : ''}
           </div>
         </div>
       </div>
@@ -773,9 +773,9 @@ async function selectWaChat(chatId, name, number, avatar) {
 
   const avatarEl = document.getElementById('waActiveChatAvatar');
   if (resolvedAvatar) {
-    avatarEl.innerHTML = `<img src="${resolvedAvatar}" class="rounded-circle w-100 h-100" alt="pic">`;
+    avatarEl.innerHTML = `<img src="${escapeHtml(resolvedAvatar)}" class="rounded-circle w-100 h-100" alt="pic">`;
   } else {
-    avatarEl.innerHTML = resolvedName.charAt(0).toUpperCase();
+    avatarEl.textContent = resolvedName.charAt(0).toUpperCase();
   }
 
   await fetchChatMessages(chatId);
@@ -1008,41 +1008,59 @@ function renderAdminClientsTable(clients) {
     const isReady = client.whatsapp_status === 'READY';
     const waClass = isReady ? 'bg-success bg-opacity-10 text-success border-success' : 'bg-danger bg-opacity-10 text-danger border-danger';
 
+    const safeTenantId = escapeHtml(client.tenant_id);
+    const safeEmail = escapeHtml(client.email);
+    const safeName = escapeHtml(client.name);
+    const safeStatus = escapeHtml(client.account_status || 'trial');
+    const safeWaStatus = escapeHtml(client.whatsapp_status || 'DISCONNECTED');
+
     return `
       <tr>
         <td>
-          <div class="fw-bold text-light">${escapeHtml(client.name)}</div>
-          <div class="text-secondary fs-8">${escapeHtml(client.email)}</div>
-          <div class="text-info fs-8 font-monospace">${client.tenant_id}</div>
+          <div class="fw-bold text-light">${safeName}</div>
+          <div class="text-secondary fs-8">${safeEmail}</div>
+          <div class="text-info fs-8 font-monospace">${safeTenantId}</div>
         </td>
-        <td class="text-secondary fs-8">${client.signup_date ? client.signup_date.substring(0,10) : '-'}</td>
-        <td class="text-light fs-8">${client.trial_expiry_date ? client.trial_expiry_date.substring(0,10) : '-'}</td>
+        <td class="text-secondary fs-8">${escapeHtml(client.signup_date ? client.signup_date.substring(0,10) : '-')}</td>
+        <td class="text-light fs-8">${escapeHtml(client.trial_expiry_date ? client.trial_expiry_date.substring(0,10) : '-')}</td>
         <td>
           <span class="badge ${client.remaining_trial_days <= 3 ? 'bg-warning text-dark' : 'bg-secondary'} fs-8">
-            ${client.remaining_trial_days} Days
+            ${Number(client.remaining_trial_days || 0)} Days
           </span>
         </td>
-        <td><span class="badge ${statusClass} border border-opacity-30 fs-8">${client.account_status.toUpperCase()}</span></td>
-        <td><span class="badge ${waClass} border border-opacity-30 fs-8">${client.whatsapp_status}</span></td>
+        <td><span class="badge ${statusClass} border border-opacity-30 fs-8">${safeStatus.toUpperCase()}</span></td>
+        <td><span class="badge ${waClass} border border-opacity-30 fs-8">${safeWaStatus}</span></td>
         <td>
-          <span class="text-success fw-bold">${client.remaining_credits}</span> / 
-          <span class="text-secondary">${client.allocated_credits}</span>
+          <span class="text-success fw-bold">${Number(client.remaining_credits || 0)}</span> / 
+          <span class="text-secondary">${Number(client.allocated_credits || 0)}</span>
         </td>
-        <td class="fw-semibold text-info">${client.total_messages_sent}</td>
-        <td class="text-secondary fs-8">${client.last_login_at ? client.last_login_at.substring(0,16) : 'Never'}</td>
+        <td class="fw-semibold text-info">${Number(client.total_messages_sent || 0)}</td>
+        <td>
+          <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 fs-8">
+            <i class="bi bi-people-fill me-1"></i>${Number(client.total_contacts_collected || 0)} Leads
+          </span>
+        </td>
+        <td class="text-secondary fs-8">${escapeHtml(client.last_login_at ? client.last_login_at.substring(0,16) : 'Never')}</td>
         <td class="text-end">
-          <div class="dropdown">
-            <button class="btn btn-sm btn-outline-light px-2 py-1 fs-8" type="button" data-bs-toggle="dropdown">
-              Actions <i class="bi bi-chevron-down ms-1"></i>
+          <div class="d-flex justify-content-end align-items-center gap-1">
+            <button class="btn btn-sm btn-outline-success px-2 py-1 fs-8 btn-download-contacts-direct" data-tenant-id="${safeTenantId}" data-email="${safeEmail}" data-name="${safeName}" title="1-Click Download Client Directory as CSV">
+              <i class="bi bi-download me-1"></i>Directory CSV
             </button>
-            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end fs-7">
-              <li><a class="dropdown-item admin-action-btn" style="cursor: pointer;" data-action="extend-trial" data-tenant-id="${client.tenant_id}" data-email="${client.email}"><i class="bi bi-calendar-plus me-2 text-info"></i>Extend Trial Expiry</a></li>
-              <li><a class="dropdown-item admin-action-btn" style="cursor: pointer;" data-action="recharge" data-tenant-id="${client.tenant_id}" data-email="${client.email}"><i class="bi bi-coin me-2 text-warning"></i>Recharge Credits</a></li>
-              <li><a class="dropdown-item admin-action-btn" style="cursor: pointer;" data-action="change-status" data-tenant-id="${client.tenant_id}" data-email="${client.email}" data-status="${client.account_status}"><i class="bi bi-shield-slash me-2 text-primary"></i>Change Account Status</a></li>
-              <li><a class="dropdown-item admin-action-btn text-warning" style="cursor: pointer;" data-action="disconnect-wa" data-tenant-id="${client.tenant_id}" data-email="${client.email}"><i class="bi bi-power me-2"></i>Disconnect WhatsApp</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item admin-action-btn text-danger" style="cursor: pointer;" data-action="delete" data-tenant-id="${client.tenant_id}" data-email="${client.email}"><i class="bi bi-trash3 me-2"></i>Delete Client Account</a></li>
-            </ul>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-light px-2 py-1 fs-8" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end fs-7">
+                <li><a class="dropdown-item admin-action-btn text-success" style="cursor: pointer;" data-action="download-contacts" data-tenant-id="${safeTenantId}" data-email="${safeEmail}" data-name="${safeName}"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Export Contacts Directory (CSV)</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item admin-action-btn" style="cursor: pointer;" data-action="extend-trial" data-tenant-id="${safeTenantId}" data-email="${safeEmail}"><i class="bi bi-calendar-plus me-2 text-info"></i>Extend Trial Expiry</a></li>
+                <li><a class="dropdown-item admin-action-btn" style="cursor: pointer;" data-action="recharge" data-tenant-id="${safeTenantId}" data-email="${safeEmail}"><i class="bi bi-coin me-2 text-warning"></i>Recharge Credits</a></li>
+                <li><a class="dropdown-item admin-action-btn" style="cursor: pointer;" data-action="change-status" data-tenant-id="${safeTenantId}" data-email="${safeEmail}" data-status="${safeStatus}"><i class="bi bi-shield-slash me-2 text-primary"></i>Change Account Status</a></li>
+                <li><a class="dropdown-item admin-action-btn text-warning" style="cursor: pointer;" data-action="disconnect-wa" data-tenant-id="${safeTenantId}" data-email="${safeEmail}"><i class="bi bi-power me-2"></i>Disconnect WhatsApp</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item admin-action-btn text-danger" style="cursor: pointer;" data-action="delete" data-tenant-id="${safeTenantId}" data-email="${safeEmail}"><i class="bi bi-trash3 me-2"></i>Delete Client Account</a></li>
+              </ul>
+            </div>
           </div>
         </td>
       </tr>
@@ -1411,6 +1429,24 @@ function setupEventListeners() {
     };
   }
 
+  // 1-Click Copy Tenant ID Button (Session Metadata)
+  const btnCopyTenantId = document.getElementById('btnCopyTenantId');
+  if (btnCopyTenantId) {
+    btnCopyTenantId.onclick = () => {
+      const tenantId = document.getElementById('metaTenantId')?.innerText || '';
+      if (tenantId && tenantId !== '-') {
+        navigator.clipboard.writeText(tenantId).then(() => {
+          btnCopyTenantId.innerHTML = '<i class="bi bi-check-lg text-success"></i>';
+          setTimeout(() => {
+            btnCopyTenantId.innerHTML = '<i class="bi bi-copy fs-8"></i>';
+          }, 2000);
+        }).catch(err => {
+          console.warn('Clipboard write error:', err);
+        });
+      }
+    };
+  }
+
   // Delete Account Button (Client Dashboard Navbar)
   const btnDeleteAccountTop = document.getElementById('btnDeleteAccountTop');
   if (btnDeleteAccountTop) {
@@ -1470,6 +1506,10 @@ function setupEventListeners() {
   const waChatListContainer = document.getElementById('waChatListContainer');
   if (waChatListContainer) {
     waChatListContainer.onclick = (e) => {
+      if (e.target.closest('.btn-open-new-chat')) {
+        openNewChatPrompt();
+        return;
+      }
       const item = e.target.closest('.wa-chat-item');
       if (!item) return;
       const chatId = item.dataset.chatId;
@@ -1578,15 +1618,15 @@ function setupEventListeners() {
 
         const data = await res.json();
         if (res.ok && data.status === 'success') {
-          resultDiv.innerHTML = `<div class="alert alert-success border-success bg-success bg-opacity-10 text-success p-3 rounded-3 fs-7"><i class="bi bi-check-circle-fill me-2"></i>${data.message || 'WhatsApp message sent successfully!'}</div>`;
+          resultDiv.innerHTML = `<div class="alert alert-success border-success bg-success bg-opacity-10 text-success p-3 rounded-3 fs-7"><i class="bi bi-check-circle-fill me-2"></i>${escapeHtml(data.message || 'WhatsApp message sent successfully!')}</div>`;
           document.getElementById('sendMessageText').value = '';
           fileInput.value = '';
           fetchClientDashboardData();
         } else {
-          resultDiv.innerHTML = `<div class="alert alert-danger border-danger bg-danger bg-opacity-10 text-danger p-3 rounded-3 fs-7"><i class="bi bi-exclamation-triangle-fill me-2"></i>Failed: ${data.reason || 'Sending failed'}</div>`;
+          resultDiv.innerHTML = `<div class="alert alert-danger border-danger bg-danger bg-opacity-10 text-danger p-3 rounded-3 fs-7"><i class="bi bi-exclamation-triangle-fill me-2"></i>Failed: ${escapeHtml(data.reason || 'Sending failed')}</div>`;
         }
       } catch (err) {
-        resultDiv.innerHTML = `<div class="alert alert-danger border-danger bg-danger bg-opacity-10 text-danger p-3 rounded-3 fs-7">Network Error: ${err.message}</div>`;
+        resultDiv.innerHTML = `<div class="alert alert-danger border-danger bg-danger bg-opacity-10 text-danger p-3 rounded-3 fs-7">Network Error: ${escapeHtml(err.message)}</div>`;
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-send me-1"></i> Send WhatsApp Message';
@@ -1617,10 +1657,27 @@ function setupEventListeners() {
     btnRefreshAdminClients.onclick = fetchAdminClientsData;
   }
 
+  // Export All Leads (CSV) Button in Admin Dashboard
+  const btnExportAllContacts = document.getElementById('btnExportAllContacts');
+  if (btnExportAllContacts) {
+    btnExportAllContacts.onclick = downloadAllContactsCsv;
+  }
+
   // Admin Table Actions Event Delegation (to comply with CSP script-src-attr 'none')
   const adminClientsTableBody = document.getElementById('adminClientsTableBody');
   if (adminClientsTableBody) {
     adminClientsTableBody.onclick = (e) => {
+      // 1. Direct 1-click Download Contacts button
+      const directDownloadBtn = e.target.closest('.btn-download-contacts-direct');
+      if (directDownloadBtn) {
+        e.preventDefault();
+        const tenantId = directDownloadBtn.getAttribute('data-tenant-id');
+        const nameOrEmail = directDownloadBtn.getAttribute('data-name') || directDownloadBtn.getAttribute('data-email');
+        downloadClientContactsCsv(tenantId, nameOrEmail);
+        return;
+      }
+
+      // 2. Dropdown action items
       const btn = e.target.closest('.admin-action-btn');
       if (!btn) return;
       e.preventDefault();
@@ -1628,8 +1685,11 @@ function setupEventListeners() {
       const action = btn.getAttribute('data-action');
       const tenantId = btn.getAttribute('data-tenant-id');
       const email = btn.getAttribute('data-email');
+      const name = btn.getAttribute('data-name');
 
-      if (action === 'extend-trial') {
+      if (action === 'download-contacts') {
+        downloadClientContactsCsv(tenantId, name || email);
+      } else if (action === 'extend-trial') {
         openExtendTrialModal(tenantId, email);
       } else if (action === 'recharge') {
         openRechargeModal(tenantId, email);
@@ -1642,6 +1702,59 @@ function setupEventListeners() {
         adminDeleteClientAccount(tenantId, email);
       }
     };
+  }
+}
+
+async function downloadClientContactsCsv(tenantId, nameOrEmail) {
+  try {
+    const res = await fetch(`/api/admin/clients/${encodeURIComponent(tenantId)}/contacts/export`, {
+      headers: { 'Authorization': `Bearer ${state.token}` }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ reason: 'Download failed' }));
+      alert('CSV Download failed: ' + (err.reason || res.statusText));
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = (nameOrEmail || tenantId).replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const dateStr = new Date().toISOString().substring(0, 10);
+    a.download = `directory_${safeName}_${dateStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Error downloading contacts CSV: ' + err.message);
+  }
+}
+
+async function downloadAllContactsCsv() {
+  try {
+    const res = await fetch('/api/admin/contacts/export', {
+      headers: { 'Authorization': `Bearer ${state.token}` }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ reason: 'Export failed' }));
+      alert('Export failed: ' + (err.reason || res.statusText));
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateStr = new Date().toISOString().substring(0, 10);
+    a.download = `all_clients_directory_${dateStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Error exporting all contacts: ' + err.message);
   }
 }
 

@@ -1,14 +1,25 @@
 const jwt = require('jsonwebtoken');
 const https = require('https');
+const crypto = require('crypto');
 const db = require('../services/db');
 const whatsappService = require('../services/whatsapp');
 const config = require('../config/config');
 const logger = require('../services/logger');
 
 /**
- * Verify Google ID Token via Google OAuth TokenInfo API
+ * Constant-time string comparison to prevent timing side-channel attacks
  */
-function verifyGoogleToken(idToken) {
+function safeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
+/**
+ * Verify Google OAuth2 ID Token via Google OAuth TokenInfo API
+ */
+function verifyGoogleOAuthToken(idToken) {
   return new Promise((resolve, reject) => {
     const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
     https.get(url, (res) => {
@@ -18,9 +29,14 @@ function verifyGoogleToken(idToken) {
         try {
           const parsed = JSON.parse(body);
           if (res.statusCode === 200 && parsed.email) {
-            resolve(parsed);
+            resolve({
+              email: parsed.email,
+              name: parsed.name || parsed.email.split('@')[0],
+              picture: parsed.picture || null,
+              sub: parsed.sub || null
+            });
           } else {
-            reject(new Error(parsed.error_description || 'Invalid Google ID token'));
+            reject(new Error(parsed.error_description || 'Invalid Google OAuth ID token'));
           }
         } catch (e) {
           reject(e);
@@ -33,18 +49,70 @@ function verifyGoogleToken(idToken) {
 }
 
 /**
- * Helper to parse JWT payload without signature check (for client side GIS credential decode fallback)
+ * Verify Firebase ID Token via Google Identity Toolkit REST API
  */
-function decodeJwtPayload(token) {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
-    return JSON.parse(payload);
-  } catch (e) {
-    return null;
-  }
+function verifyFirebaseIdToken(idToken, apiKey) {
+  return new Promise((resolve, reject) => {
+    if (!apiKey || apiKey.startsWith('mock')) {
+      return reject(new Error('Firebase API key not configured'));
+    }
+    const postData = JSON.stringify({ idToken });
+    const req = https.request({
+      hostname: 'identitytoolkit.googleapis.com',
+      path: `/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (res.statusCode === 200 && parsed.users && parsed.users.length > 0 && parsed.users[0].email) {
+            const u = parsed.users[0];
+            resolve({
+              email: u.email,
+              name: u.displayName || u.email.split('@')[0],
+              picture: u.photoUrl || null,
+              sub: u.localId || null
+            });
+          } else {
+            const errMsg = (parsed.error && parsed.error.message) || 'Invalid Firebase ID token';
+            reject(new Error(errMsg));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
 }
+
+/**
+ * Verify token using Firebase Identity Toolkit first, then Google OAuth2 TokenInfo
+ */
+async function verifyGoogleToken(idToken) {
+  const activeConfig = config.get();
+  if (activeConfig.FIREBASE_API_KEY && !activeConfig.FIREBASE_API_KEY.startsWith('mock')) {
+    try {
+      return await verifyFirebaseIdToken(idToken, activeConfig.FIREBASE_API_KEY);
+    } catch (firebaseErr) {
+      logger.debug('Firebase token lookup did not match, trying Google OAuth tokeninfo: %s', firebaseErr.message);
+    }
+  }
+  return await verifyGoogleOAuthToken(idToken);
+}
+
+// SECURITY: decodeJwtPayload helper intentionally removed.
+// Decoding a JWT WITHOUT verifying its signature is an authentication bypass —
+// it would allow any attacker to craft a base64-encoded payload and gain access.
+// Cryptographic token verification (verifyGoogleToken) is the ONLY accepted path.
 
 /**
  * POST /api/auth/google
@@ -52,27 +120,26 @@ function decodeJwtPayload(token) {
  */
 exports.googleLogin = async (req, res) => {
   try {
-    const { idToken, credential, email, name, picture, googleId } = req.body;
+    const { idToken, credential } = req.body;
     let googleUser = null;
     const tokenToVerify = idToken || credential;
 
-    if (tokenToVerify) {
-      try {
-        googleUser = await verifyGoogleToken(tokenToVerify);
-      } catch (tokenErr) {
-        logger.warn('Google online token verification failed, attempting payload decoding: %s', tokenErr.message);
-        googleUser = decodeJwtPayload(tokenToVerify);
-      }
+    if (!tokenToVerify) {
+      return res.status(400).json({
+        status: 'failed',
+        reason: 'Google authentication failed: Valid ID token is required.'
+      });
     }
 
-    // Fallback if client passed raw profile fields (e.g., local dev or direct auth)
-    if (!googleUser && email) {
-      googleUser = {
-        email,
-        name: name || email.split('@')[0],
-        picture: picture || null,
-        sub: googleId || null
-      };
+    try {
+      googleUser = await verifyGoogleToken(tokenToVerify);
+    } catch (tokenErr) {
+      // SECURITY: Do NOT fall back to raw JWT decoding — that would bypass signature verification.
+      logger.warn('Google token verification failed: %s', tokenErr.message);
+      return res.status(401).json({
+        status: 'failed',
+        reason: 'Google authentication failed: Token verification failed. Please try signing in again.'
+      });
     }
 
     if (!googleUser || !googleUser.email) {
@@ -158,21 +225,22 @@ exports.googleLogin = async (req, res) => {
     logger.error('Error in googleLogin controller: %s', err.stack || err.message);
     return res.status(500).json({
       status: 'failed',
-      reason: err.message || 'Google authentication error'
+      reason: 'Google authentication error'
     });
   }
 };
 
 /**
  * POST /api/auth/admin/login
- * Handles Master Admin login
+ * Handles Master Admin login with constant-time password verification
  */
 exports.adminLogin = async (req, res) => {
   const { password } = req.body;
   const activeConfig = config.get();
-  const expectedPassword = activeConfig.MASTER_ADMIN_PASSWORD || 'admin123';
+  const expectedPassword = String(activeConfig.MASTER_ADMIN_PASSWORD || 'admin123').trim();
 
-  if (!password || password.toString().trim() !== expectedPassword.toString().trim()) {
+  if (!password || !safeCompare(String(password).trim(), expectedPassword)) {
+    logger.warn('Failed Master Admin login attempt from IP: %s', req.ip);
     return res.status(401).json({
       status: 'failed',
       reason: 'Invalid Admin Password'

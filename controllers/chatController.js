@@ -1,6 +1,10 @@
 const whatsappService = require('../services/whatsapp');
 const logger = require('../services/logger');
 
+function isValidChatId(chatId) {
+  return typeof chatId === 'string' && /^[\w.\-@]{3,128}$/.test(chatId);
+}
+
 /**
  * GET /api/whatsapp/chats
  * Fetches real-time WhatsApp Web chat list for authenticated tenant
@@ -12,7 +16,7 @@ exports.getChats = async (req, res) => {
     return res.status(200).json({ status: 'success', chats });
   } catch (err) {
     logger.error(`[Tenant: ${tenantId}] Failed to fetch WhatsApp chats: %s`, err.message);
-    return res.status(500).json({ status: 'failed', reason: err.message });
+    return res.status(500).json({ status: 'failed', reason: 'Failed to fetch WhatsApp chats' });
   }
 };
 
@@ -23,14 +27,18 @@ exports.getChats = async (req, res) => {
 exports.getMessages = async (req, res) => {
   const tenantId = req.tenant.tenant_id;
   const { chatId } = req.params;
-  const limit = parseInt(req.query.limit || 50, 10);
+  if (!isValidChatId(chatId)) {
+    return res.status(400).json({ status: 'failed', reason: 'Invalid chatId format' });
+  }
+  const rawLimit = parseInt(req.query.limit || 50, 10);
+  const limit = Math.min(Math.max(isNaN(rawLimit) ? 50 : rawLimit, 1), 200);
 
   try {
     const messages = await whatsappService.getChatMessages(tenantId, chatId, limit);
     return res.status(200).json({ status: 'success', chatId, messages });
   } catch (err) {
     logger.error(`[Tenant: ${tenantId}] Failed to fetch messages for ${chatId}: %s`, err.message);
-    return res.status(500).json({ status: 'failed', reason: err.message });
+    return res.status(500).json({ status: 'failed', reason: 'Failed to fetch chat messages' });
   }
 };
 
@@ -41,6 +49,9 @@ exports.getMessages = async (req, res) => {
 exports.sendMessage = async (req, res) => {
   const tenantId = req.tenant.tenant_id;
   const { chatId } = req.params;
+  if (!isValidChatId(chatId)) {
+    return res.status(400).json({ status: 'failed', reason: 'Invalid chatId format' });
+  }
   const body = req.body.body || req.body.message;
   const file = req.file;
 
@@ -53,7 +64,7 @@ exports.sendMessage = async (req, res) => {
     return res.status(200).json({ status: 'success', message: msg });
   } catch (err) {
     logger.error(`[Tenant: ${tenantId}] Error sending chat message to ${chatId}: %s`, err.message);
-    return res.status(500).json({ status: 'failed', reason: err.message });
+    return res.status(500).json({ status: 'failed', reason: 'Error sending chat message' });
   }
 };
 
@@ -64,11 +75,14 @@ exports.sendMessage = async (req, res) => {
 exports.markRead = async (req, res) => {
   const tenantId = req.tenant.tenant_id;
   const { chatId } = req.params;
+  if (!isValidChatId(chatId)) {
+    return res.status(400).json({ status: 'failed', reason: 'Invalid chatId format' });
+  }
 
   try {
     await whatsappService.markChatAsRead(tenantId, chatId);
     return res.status(200).json({ status: 'success', chatId });
   } catch (err) {
-    return res.status(500).json({ status: 'failed', reason: err.message });
+    return res.status(500).json({ status: 'failed', reason: 'Failed to mark chat as read' });
   }
 };

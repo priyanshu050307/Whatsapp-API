@@ -6,6 +6,7 @@ const config = require('../config/config');
 const logger = require('./logger');
 const socketService = require('./socketService');
 const db = require('./db');
+const logService = require('./logService');
 
 const sessions = new Map(); // tenantId -> session object
 
@@ -32,6 +33,190 @@ function getOrCreateSession(tenantId) {
   };
   sessions.set(tenantId, session);
   return session;
+}
+
+// Automatically ensure whatsapp-web.js injected Utils.js has the media memoization patch
+function applyWWebJSMediaPatch() {
+  try {
+    const utilsPath = path.resolve(__dirname, '../node_modules/whatsapp-web.js/src/util/Injected/Utils.js');
+    if (fs.existsSync(utilsPath)) {
+      let content = fs.readFileSync(utilsPath, 'utf8');
+      let modified = false;
+      if (!content.includes('delete mediaOptions.id;')) {
+        content = content.replace(
+          'delete options.sendMediaAsSticker;',
+          'delete options.sendMediaAsSticker;\n            delete mediaOptions.id;\n            delete mediaOptions.__x_id;'
+        );
+        modified = true;
+      }
+      if (!content.includes('// Fix: WhatsApp Web MobX memoization getter collision')) {
+        content = content.replace(
+          '...extraOptions,\n        };',
+          '...extraOptions,\n        };\n\n        // Fix: WhatsApp Web MobX memoization getter collision on media send (#2271)\n        delete message.__x_id;\n        message.id = newMsgKey;'
+        );
+        modified = true;
+      }
+      if (modified) {
+        fs.writeFileSync(utilsPath, content, 'utf8');
+        logger.info('[WhatsApp] Applied automated runtime patch to whatsapp-web.js Utils.js');
+      }
+    }
+  } catch (err) {
+    logger.warn('[WhatsApp] Notice applying whatsapp-web.js media patch: %s', err.message);
+  }
+}
+applyWWebJSMediaPatch();
+
+// Track whatsapp-web.js version status & cached WhatsApp Web builds
+const libraryVersionStatus = {
+  installed: null,
+  latestNpm: null,
+  latestGithubRelease: null,
+  updateAvailable: false,
+  lastCheckedAt: null,
+  cachedWWebVersions: []
+};
+
+const SEMVER_REGEX = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+function fetchJsonHttps(url, timeoutMs = 5000) {
+  const https = require('https');
+  const maxBytes = 1024 * 1024; // 1 MB max response guard
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        'User-Agent': 'whatsapp-busy-gateway',
+        'Accept': 'application/json'
+      }
+    }, (res) => {
+      if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode} from ${url}`));
+      }
+      let data = '';
+      let receivedBytes = 0;
+      res.on('data', chunk => {
+        receivedBytes += chunk.length;
+        if (receivedBytes > maxBytes) {
+          req.destroy(new Error(`Response exceeded ${maxBytes} bytes limit`));
+          return;
+        }
+        data += chunk;
+      });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Request timeout after ${timeoutMs}ms: ${url}`));
+    });
+  });
+}
+
+// Monitor .wwebjs_cache HTML builds and prune stale versions to prevent cache bloat/corruption
+function pruneAndMonitorWWebCache(maxKeep = 3) {
+  const cacheDir = path.resolve(__dirname, '../.wwebjs_cache');
+  const summary = { totalFound: 0, kept: [], pruned: [] };
+  try {
+    if (!fs.existsSync(cacheDir)) {
+      return summary;
+    }
+    const htmlFiles = fs.readdirSync(cacheDir)
+      .filter(f => f.endsWith('.html'))
+      .map(name => {
+        const fullPath = path.join(cacheDir, name);
+        const stat = fs.statSync(fullPath);
+        return { name, fullPath, mtimeMs: stat.mtimeMs };
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    summary.totalFound = htmlFiles.length;
+    const toKeep = htmlFiles.slice(0, maxKeep);
+    const toPrune = htmlFiles.slice(maxKeep);
+
+    summary.kept = toKeep.map(f => f.name.replace(/\.html$/, ''));
+    libraryVersionStatus.cachedWWebVersions = summary.kept;
+
+    if (toPrune.length > 0) {
+      logger.warn(
+        `[WhatsApp] .wwebjs_cache has ${htmlFiles.length} cached WA Web versions — pruning ${toPrune.length} old build(s)...`
+      );
+      for (const file of toPrune) {
+        try {
+          fs.unlinkSync(file.fullPath);
+          summary.pruned.push(file.name.replace(/\.html$/, ''));
+        } catch (unlinkErr) {
+          logger.debug(`[WhatsApp] Could not prune cached build ${file.name}: ${unlinkErr.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.debug(`[WhatsApp] Notice checking .wwebjs_cache: ${err.message}`);
+  }
+  return summary;
+}
+
+// Auto-detect if a newer whatsapp-web.js version is available on npm or GitHub Releases
+async function checkForLibraryUpdate() {
+  try {
+    const pkgPath = path.resolve(__dirname, '../node_modules/whatsapp-web.js/package.json');
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      libraryVersionStatus.installed = pkg.version;
+    }
+
+    const [npmResult, githubResult] = await Promise.allSettled([
+      fetchJsonHttps('https://registry.npmjs.org/whatsapp-web.js/latest'),
+      fetchJsonHttps('https://api.github.com/repos/pedroslopez/whatsapp-web.js/releases/latest')
+    ]);
+
+    if (npmResult.status === 'fulfilled' && npmResult.value?.version) {
+      const candidate = String(npmResult.value.version).trim();
+      if (SEMVER_REGEX.test(candidate)) {
+        libraryVersionStatus.latestNpm = candidate;
+      }
+    }
+    if (githubResult.status === 'fulfilled' && githubResult.value?.tag_name) {
+      const candidate = String(githubResult.value.tag_name).replace(/^v/i, '').trim();
+      if (SEMVER_REGEX.test(candidate)) {
+        libraryVersionStatus.latestGithubRelease = candidate;
+      }
+    }
+
+    libraryVersionStatus.lastCheckedAt = new Date().toISOString();
+    const installedVersion = libraryVersionStatus.installed;
+    const latestVersion = libraryVersionStatus.latestNpm || libraryVersionStatus.latestGithubRelease;
+
+    if (installedVersion && latestVersion && installedVersion !== latestVersion) {
+      libraryVersionStatus.updateAvailable = true;
+      logger.warn(
+        `[WhatsApp] ⚠️  UPDATE AVAILABLE: whatsapp-web.js ${installedVersion} → ${latestVersion}. ` +
+        `Run: npm run update:whatsapp`
+      );
+    } else if (installedVersion) {
+      libraryVersionStatus.updateAvailable = false;
+      logger.info(`[WhatsApp] whatsapp-web.js is up-to-date (v${installedVersion})`);
+    }
+  } catch (err) {
+    logger.debug(`[WhatsApp] Could not check for library updates: ${err.message}`);
+  }
+  return { ...libraryVersionStatus };
+}
+
+pruneAndMonitorWWebCache(3);
+if (process.env.NODE_ENV !== 'test') {
+  checkForLibraryUpdate();
+  const updateCheckTimer = setInterval(() => {
+    checkForLibraryUpdate();
+  }, 12 * 60 * 60 * 1000);
+  if (typeof updateCheckTimer.unref === 'function') {
+    updateCheckTimer.unref();
+  }
 }
 
 // Dynamic Chrome/Chromium path lookup for Windows & Linux environment compatibility
@@ -72,22 +257,36 @@ function getChromeExecutablePath() {
   return undefined;
 }
 
+// Validate tenantId to strictly prevent path traversal on filesystem operations
+function sanitizeTenantId(tenantId) {
+  const str = String(tenantId || '').trim();
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(str)) {
+    throw new Error('Invalid tenantId format');
+  }
+  return str;
+}
+
 // Initialize WhatsApp Web Client for a specific Tenant
 function initClient(tenantId) {
-  const session = getOrCreateSession(tenantId);
+  const safeTenantId = sanitizeTenantId(tenantId);
+  const session = getOrCreateSession(safeTenantId);
   if (session.client) {
-    logger.info(`[Tenant: ${tenantId}] WhatsApp Client already exists. Skipping initialization.`);
+    logger.info(`[Tenant: ${safeTenantId}] WhatsApp Client already exists. Skipping initialization.`);
     return;
   }
   
   session.isExplicitLogout = false;
-  logger.info(`[Tenant: ${tenantId}] Initializing WhatsApp Web Client...`);
+  logger.info(`[Tenant: ${safeTenantId}] Initializing WhatsApp Web Client...`);
   session.clientState = 'CONNECTING';
   session.qrCodeData = null;
-  socketService.emitToTenant(tenantId, 'whatsapp_status', { state: 'CONNECTING' });
+  socketService.emitToTenant(safeTenantId, 'whatsapp_status', { state: 'CONNECTING' });
   
   const activeConfig = config.get();
-  const authPath = path.resolve(activeConfig.SESSION_PATH || './session', tenantId);
+  const baseSessionDir = path.resolve(activeConfig.SESSION_PATH || './session');
+  const authPath = path.resolve(baseSessionDir, safeTenantId);
+  if (!authPath.startsWith(baseSessionDir + path.sep)) {
+    throw new Error('Path traversal attempt blocked');
+  }
   
   if (!fs.existsSync(authPath)) {
     fs.mkdirSync(authPath, { recursive: true });
@@ -100,8 +299,7 @@ function initClient(tenantId) {
       dataPath: authPath
     }),
     webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+      type: 'local'
     },
     puppeteer: {
       headless: activeConfig.PUPPETEER_HEADLESS,
@@ -175,6 +373,7 @@ function initClient(tenantId) {
       session.client.getWWebVersion().then(v => {
         session.clientInfo.wwebVersion = v;
         logger.info(`[Tenant: ${tenantId}] WhatsApp Web Engine version: ${v}`);
+        pruneAndMonitorWWebCache(3);
       });
     } catch (e) {
       logger.debug(`[Tenant: ${tenantId}] Could not retrieve WhatsApp Web version: %s`, e.message);
@@ -607,16 +806,33 @@ async function sendMessageToChat(tenantId, chatId, body, file = null) {
     throw new Error(`WhatsApp client not connected for tenant ${tenantId}`);
   }
 
-  const formattedChatId = chatId.includes('@') ? chatId : `${chatId.replace(/\D/g, '')}@c.us`;
+  let rawNumber = chatId.replace(/[^0-9]/g, '');
+  let formattedChatId = chatId.includes('@') ? chatId : `${rawNumber}@c.us`;
+  try {
+    if (session.client && session.client.getNumberId && rawNumber) {
+      const numberDetails = await session.client.getNumberId(rawNumber);
+      if (numberDetails && numberDetails._serialized) {
+        formattedChatId = numberDetails._serialized;
+      }
+    }
+  } catch (idErr) {
+    logger.debug(`[Tenant: ${tenantId}] Notice resolving numberId for ${rawNumber}: %s`, idErr.message);
+  }
 
   let response;
   if (file) {
     const base64Data = file.buffer.toString('base64');
     const media = new MessageMedia(file.mimetype, base64Data, file.originalname);
-    response = await session.client.sendMessage(formattedChatId, media);
+    const isPdf = (file.mimetype && file.mimetype.includes('pdf')) || 
+                  (file.originalname && file.originalname.toLowerCase().endsWith('.pdf'));
+    const isDocument = isPdf || !(file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')));
+    const sendOptions = {
+      sendMediaAsDocument: isDocument
+    };
     if (body) {
-      await session.client.sendMessage(formattedChatId, body);
+      sendOptions.caption = body;
     }
+    response = await session.client.sendMessage(formattedChatId, media, sendOptions);
   } else {
     response = await session.client.sendMessage(formattedChatId, body);
   }
@@ -642,6 +858,7 @@ async function sendMessageToChat(tenantId, chatId, body, file = null) {
   // Deduct 1 credit & log message
   await db.deductCredit(tenantId);
   await db.logMessage(tenantId, formattedChatId.replace('@c.us', ''), body || 'Media Attachment', 'success');
+  await db.recordContact(tenantId, formattedChatId.replace('@c.us', ''), body || 'Media Attachment');
 
   // Emit real-time message event to tenant room
   socketService.emitToTenant(tenantId, 'whatsapp_message', msgPayload);
@@ -668,14 +885,14 @@ async function markChatAsRead(tenantId, chatId) {
 }
 
 // Send legacy API message with queue tracking (asynchronous background queue)
-async function sendWhatsAppMessage(tenantId, to, message, file = null) {
+async function sendWhatsAppMessage(tenantId, to, message, file = null, logId = null, deductedCredits = null) {
   const session = sessions.get(tenantId);
   if (!session || session.clientState !== 'READY' || !session.client) {
     throw new Error(`WhatsApp client not ready for tenant ${tenantId}. Current Status: ${session ? session.clientState : 'DISCONNECTED'}`);
   }
 
   const standardizedMobile = to.replace(/[^0-9]/g, '');
-  const queueItem = { to, message, file, standardizedMobile, logId: null };
+  const queueItem = { to, message, file, standardizedMobile, logId, deductedCredits };
   session.sendingQueue.push(queueItem);
 
   // Start processing queue if not running
@@ -723,16 +940,33 @@ async function triggerQueueProcessor(tenantId) {
         const task = session.sendingQueue[0]; // peek
         
         try {
-          let formattedTo = task.to.includes('@') ? task.to : `${task.to.replace(/[^0-9]/g, '')}@c.us`;
+          let rawNumber = task.to.replace(/[^0-9]/g, '');
+          let formattedTo = task.to.includes('@') ? task.to : `${rawNumber}@c.us`;
+          try {
+            if (session.client && session.client.getNumberId && rawNumber) {
+              const numberDetails = await session.client.getNumberId(rawNumber);
+              if (numberDetails && numberDetails._serialized) {
+                formattedTo = numberDetails._serialized;
+              }
+            }
+          } catch (idErr) {
+            logger.debug(`[Tenant: ${tenantId}] Notice resolving numberId for ${rawNumber}: %s`, idErr.message);
+          }
           let response;
           
           if (task.file) {
             const base64Data = task.file.buffer.toString('base64');
             const media = new MessageMedia(task.file.mimetype, base64Data, task.file.originalname);
-            response = await session.client.sendMessage(formattedTo, media);
+            const isPdf = (task.file.mimetype && task.file.mimetype.includes('pdf')) || 
+                          (task.file.originalname && task.file.originalname.toLowerCase().endsWith('.pdf'));
+            const isDocument = isPdf || !(task.file.mimetype && (task.file.mimetype.startsWith('image/') || task.file.mimetype.startsWith('video/')));
+            const sendOptions = {
+              sendMediaAsDocument: isDocument
+            };
             if (task.message) {
-              await session.client.sendMessage(formattedTo, task.message);
+              sendOptions.caption = task.message;
             }
+            response = await session.client.sendMessage(formattedTo, media, sendOptions);
           } else {
             response = await session.client.sendMessage(formattedTo, task.message);
           }
@@ -744,8 +978,10 @@ async function triggerQueueProcessor(tenantId) {
             ? (typeof response.id === 'object' ? (response.id._serialized || response.id.id) : String(response.id))
             : `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
-          // Log success to DB (only if not pre-logged)
-          if (!task.logId) {
+          // Log success to DB
+          if (task.logId) {
+            await logService.updateLogStatus(task.logId, 'success');
+          } else {
             await logService.logWhatsAppMessage(tenantId, task.standardizedMobile, task.message, 'success');
           }
 
@@ -794,30 +1030,32 @@ async function triggerQueueProcessor(tenantId) {
 
 // Logout session
 async function logoutSession(tenantId) {
-  const session = sessions.get(tenantId);
+  const safeTenantId = sanitizeTenantId(tenantId);
+  const session = sessions.get(safeTenantId);
   if (session) {
     session.isExplicitLogout = true;
     if (session.client) {
       try {
         session.client.removeAllListeners();
         await session.client.logout();
-        logger.info(`[Tenant: ${tenantId}] WhatsApp session logged out by user request.`);
+        logger.info(`[Tenant: ${safeTenantId}] WhatsApp session logged out by user request.`);
       } catch (err) {
-        logger.error(`[Tenant: ${tenantId}] Error logging out WhatsApp session: %s`, err.message);
+        logger.error(`[Tenant: ${safeTenantId}] Error logging out WhatsApp session: %s`, err.message);
       }
     }
   }
 
-  await destroyClient(tenantId, { isExplicitLogout: true });
+  await destroyClient(safeTenantId, { isExplicitLogout: true });
 
   const activeConfig = config.get();
-  const authPath = path.resolve(activeConfig.SESSION_PATH || './session', tenantId);
-  if (fs.existsSync(authPath)) {
+  const baseSessionDir = path.resolve(activeConfig.SESSION_PATH || './session');
+  const authPath = path.resolve(baseSessionDir, safeTenantId);
+  if (authPath.startsWith(baseSessionDir + path.sep) && fs.existsSync(authPath)) {
     try {
       fs.rmSync(authPath, { recursive: true, force: true });
-      logger.info(`[Tenant: ${tenantId}] Deleted session storage directory on logout: ${authPath}`);
+      logger.info(`[Tenant: ${safeTenantId}] Deleted session storage directory on logout: ${authPath}`);
     } catch (err) {
-      logger.error(`[Tenant: ${tenantId}] Failed to delete session storage directory on logout: %s`, err.message);
+      logger.error(`[Tenant: ${safeTenantId}] Failed to delete session storage directory on logout: %s`, err.message);
     }
   }
 
@@ -826,29 +1064,32 @@ async function logoutSession(tenantId) {
 
 // Delete session storage data
 async function deleteSessionData(tenantId) {
-  logger.info(`[Tenant: ${tenantId}] Permanently deleting WhatsApp session and disk storage...`);
-  await destroyClient(tenantId, { isExplicitLogout: true });
-  sessions.delete(tenantId);
+  const safeTenantId = sanitizeTenantId(tenantId);
+  logger.info(`[Tenant: ${safeTenantId}] Permanently deleting WhatsApp session and disk storage...`);
+  await destroyClient(safeTenantId, { isExplicitLogout: true });
+  sessions.delete(safeTenantId);
 
   const activeConfig = config.get();
-  const authPath = path.resolve(activeConfig.SESSION_PATH || './session', tenantId);
-  if (fs.existsSync(authPath)) {
+  const baseSessionDir = path.resolve(activeConfig.SESSION_PATH || './session');
+  const authPath = path.resolve(baseSessionDir, safeTenantId);
+  if (authPath.startsWith(baseSessionDir + path.sep) && fs.existsSync(authPath)) {
     try {
       fs.rmSync(authPath, { recursive: true, force: true });
-      logger.info(`[Tenant: ${tenantId}] Deleted session storage directory: ${authPath}`);
+      logger.info(`[Tenant: ${safeTenantId}] Deleted session storage directory: ${authPath}`);
     } catch (err) {
-      logger.error(`[Tenant: ${tenantId}] Failed to delete session storage directory: %s`, err.message);
+      logger.error(`[Tenant: ${safeTenantId}] Failed to delete session storage directory: %s`, err.message);
     }
   }
 
   // Delete local fallback logs if any
-  const fallbackLogPath = path.join(__dirname, `../logs/messages_${tenantId}.jsonl`);
-  if (fs.existsSync(fallbackLogPath)) {
+  const baseLogsDir = path.resolve(__dirname, '../logs');
+  const fallbackLogPath = path.resolve(baseLogsDir, `messages_${safeTenantId}.jsonl`);
+  if (fallbackLogPath.startsWith(baseLogsDir + path.sep) && fs.existsSync(fallbackLogPath)) {
     try {
       fs.unlinkSync(fallbackLogPath);
-      logger.info(`[Tenant: ${tenantId}] Deleted fallback log file: ${fallbackLogPath}`);
+      logger.info(`[Tenant: ${safeTenantId}] Deleted fallback log file: ${fallbackLogPath}`);
     } catch (err) {
-      logger.error(`[Tenant: ${tenantId}] Failed to delete fallback log file: %s`, err.message);
+      logger.error(`[Tenant: ${safeTenantId}] Failed to delete fallback log file: %s`, err.message);
     }
   }
 }
@@ -892,6 +1133,10 @@ module.exports = {
   deleteSessionData,
   restartClient,
   initAllClients,
+  applyWWebJSMediaPatch,
+  checkForLibraryUpdate,
+  pruneAndMonitorWWebCache,
+  getLibraryVersionStatus: () => ({ ...libraryVersionStatus }),
   getClientState: (tenantId) => sessions.get(tenantId) ? sessions.get(tenantId).clientState : 'DISCONNECTED',
   getQrCodeData: (tenantId) => sessions.get(tenantId) ? sessions.get(tenantId).qrCodeData : null,
   getClientInfo: (tenantId) => sessions.get(tenantId) ? sessions.get(tenantId).clientInfo : { number: null, pushname: null, platform: null, wwebVersion: null },

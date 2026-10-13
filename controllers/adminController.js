@@ -38,6 +38,7 @@ exports.getClients = async (req, res) => {
         whatsapp_status: waState,
         last_login_at: client.last_login_at || 'Never',
         total_messages_sent: client.total_messages_sent || 0,
+        total_contacts_collected: client.total_contacts_collected || 0,
         allocated_credits: client.allocated_credits || 0,
         used_credits: client.used_credits || 0,
         remaining_credits: client.remaining_credits || 0,
@@ -307,6 +308,147 @@ exports.deleteClientAccount = async (req, res) => {
     }
   } catch (err) {
     logger.error('Error in admin deleteClientAccount: %s', err.message);
+    return res.status(500).json({ status: 'failed', reason: err.message });
+  }
+};
+
+function escapeCsvValue(val) {
+  if (val === null || val === undefined) return '""';
+  let str = String(val).replace(/"/g, '""').replace(/\r\n|\n|\r/g, ' ');
+  // Mitigate CSV Formula Injection (CWE-1236) in Excel / LibreOffice / Google Sheets
+  if (/^[=+\-@\t]/.test(str)) {
+    str = "'" + str;
+  }
+  return `"${str}"`;
+}
+
+/**
+ * GET /api/admin/clients/:tenantId/contacts/export
+ * Downloads the client directory / contacts as a CSV file for the respective user
+ */
+exports.exportClientContacts = async (req, res) => {
+  const { tenantId } = req.params;
+  try {
+    const client = await db.getTenantById(tenantId);
+    if (!client) {
+      return res.status(404).json({ status: 'failed', reason: `Client '${tenantId}' not found.` });
+    }
+
+    const contacts = await db.getContactsByTenant(tenantId);
+
+    const csvHeaders = [
+      'S.No',
+      'Mobile Number',
+      'Total Messages Sent',
+      'First Contacted Date',
+      'Last Contacted Date',
+      'Last Message Sent',
+      'BUSY User Email',
+      'BUSY User Name',
+      'BUSY Channel ID'
+    ];
+
+    const rows = contacts.map((c, idx) => [
+      idx + 1,
+      c.mobile,
+      c.total_messages || 1,
+      c.first_seen_at || '',
+      c.last_seen_at || '',
+      c.last_message || '',
+      client.email || 'N/A',
+      client.name || client.username,
+      client.channel_id || ''
+    ]);
+
+    const csvContent = [
+      csvHeaders.map(escapeCsvValue).join(','),
+      ...rows.map(row => row.map(escapeCsvValue).join(','))
+    ].join('\r\n');
+
+    const safeName = (client.name || client.email || tenantId).replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const dateStr = new Date().toISOString().substring(0, 10);
+    const filename = `directory_${safeName}_${dateStr}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+
+    return res.status(200).send('\uFEFF' + csvContent);
+  } catch (err) {
+    logger.error('Error exporting client contacts CSV: %s', err.message);
+    return res.status(500).json({ status: 'failed', reason: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/clients/:tenantId/contacts
+ * Returns JSON array of contacts for the respective client
+ */
+exports.getClientContacts = async (req, res) => {
+  const { tenantId } = req.params;
+  try {
+    const contacts = await db.getContactsByTenant(tenantId);
+    return res.status(200).json({
+      status: 'success',
+      tenantId,
+      totalContacts: contacts.length,
+      contacts
+    });
+  } catch (err) {
+    return res.status(500).json({ status: 'failed', reason: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/contacts/export
+ * Downloads the global master contact directory across all clients as CSV
+ */
+exports.exportAllContacts = async (req, res) => {
+  try {
+    const search = req.query.search || '';
+    const contacts = await db.getAllContacts(search);
+
+    const csvHeaders = [
+      'S.No',
+      'Mobile Number',
+      'BUSY User Email',
+      'BUSY User Name',
+      'BUSY Channel ID',
+      'Tenant ID',
+      'Total Messages Sent',
+      'First Contacted Date',
+      'Last Contacted Date',
+      'Last Message Sent'
+    ];
+
+    const rows = contacts.map((c, idx) => [
+      idx + 1,
+      c.mobile,
+      c.client_email || 'N/A',
+      c.client_name || c.client_username || 'N/A',
+      c.client_channel_id || '',
+      c.tenant_id,
+      c.total_messages || 1,
+      c.first_seen_at || '',
+      c.last_seen_at || '',
+      c.last_message || ''
+    ]);
+
+    const csvContent = [
+      csvHeaders.map(escapeCsvValue).join(','),
+      ...rows.map(row => row.map(escapeCsvValue).join(','))
+    ].join('\r\n');
+
+    const dateStr = new Date().toISOString().substring(0, 10);
+    const filename = `all_clients_directory_${dateStr}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+
+    return res.status(200).send('\uFEFF' + csvContent);
+  } catch (err) {
+    logger.error('Error exporting all contacts CSV: %s', err.message);
     return res.status(500).json({ status: 'failed', reason: err.message });
   }
 };

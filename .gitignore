@@ -1,21 +1,48 @@
-# Node dependencies
+# Node dependencies & package logs
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
 
-# Local configuration
+# Environment files and local secrets (never commit!)
 .env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.test
 
-# WhatsApp Session Cache (highly private!)
+# WhatsApp Sessions & Browser Automation Caches (highly sensitive session tokens!)
 session/
 .wwebjs_cache/
 .wwebjs_auth/
+.puppeteer/
+.local-chromium/
 
-# Database files and raw logs
-logs/*.db
-logs/*.db-journal
-logs/*.log
-logs/*.jsonl
-logs/test_database*.db
+# Application Logs, Database backups & SQLite files
+logs/*
+!logs/.gitkeep
 
-# OS files
+# Root or stray SQLite database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# IDE / Editor artifacts
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini

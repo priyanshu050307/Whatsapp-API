@@ -4,7 +4,13 @@ const chatController = require('../controllers/chatController');
 const authMiddleware = require('../middleware/auth');
 const multer = require('multer');
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25 MB max file upload
+    files: 1
+  }
+});
 
 // Authenticated Client Live WhatsApp Web Endpoints
 router.use(authMiddleware);

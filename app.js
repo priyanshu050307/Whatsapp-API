@@ -1,4 +1,6 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+// NOTE: TLS verification is intentionally ENABLED (default). Never disable it in production.
+// If you encounter self-signed certificate issues with an internal proxy, fix the certificate
+// instead of disabling TLS verification globally.
 
 const express = require('express');
 const http = require('http');
@@ -16,7 +18,14 @@ const whatsappService = require('./services/whatsapp');
 const socketService = require('./services/socketService');
 const db = require('./services/db');
 const multer = require('multer');
-const upload = multer();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25 MB max file upload
+    files: 1,
+    fieldSize: 2 * 1024 * 1024  // 2 MB max text field
+  }
+});
 
 // Global error handlers to capture Puppeteer/whatsapp-web.js detached frame exceptions and prevent crashes
 process.on('uncaughtException', (err) => {
@@ -39,9 +48,9 @@ socketService.init(server);
 app.use(security.helmet);
 app.use(security.cors);
 
-// 2. Setup parsing middlewares
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 2. Setup parsing middlewares with explicit size limits to prevent memory exhaustion DoS
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(upload.any());
 
 // 3. Setup rate limits specifically on API and admin paths (protects dashboard static files from being rate limited)
@@ -49,13 +58,16 @@ app.use('/message', security.limiter);
 app.use('/api', security.limiter);
 app.use('/status', security.limiter);
 app.use('/qr', security.limiter);
+app.use('/logout', security.limiter);
+app.use('/restart', security.limiter);
 
 // 4. Serve dashboard frontend files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Request Logger
+// Request Logger (redacts sensitive credentials and tokens from query strings)
 app.use((req, res, next) => {
-  logger.info(`INCOMING REQUEST: ${req.method} ${req.url} - Content-Type: ${req.headers['content-type']}`);
+  const safeUrl = (req.url || '').replace(/([?&](?:password|pass|pwd|token|adminPassword)=)[^&]*/gi, '$1[REDACTED]');
+  logger.info(`INCOMING REQUEST: ${req.method} ${safeUrl} - Content-Type: ${req.headers['content-type']}`);
   next();
 });
 
