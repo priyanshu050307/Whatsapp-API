@@ -159,6 +159,8 @@ function createTenantsTable(resolve, reject) {
       if (!existingColNames.includes('trial_expiry_date')) alterQueries.push("ALTER TABLE tenants ADD COLUMN trial_expiry_date TEXT");
       if (!existingColNames.includes('last_login_at')) alterQueries.push("ALTER TABLE tenants ADD COLUMN last_login_at TEXT");
       if (!existingColNames.includes('is_admin')) alterQueries.push("ALTER TABLE tenants ADD COLUMN is_admin INTEGER DEFAULT 0");
+      if (!existingColNames.includes('current_plan')) alterQueries.push("ALTER TABLE tenants ADD COLUMN current_plan TEXT DEFAULT 'trial'");
+      if (!existingColNames.includes('plan_expiry_date')) alterQueries.push("ALTER TABLE tenants ADD COLUMN plan_expiry_date TEXT");
 
       const onSchemaComplete = () => {
         db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_email ON tenants(email) WHERE email IS NOT NULL', (idxErr) => {
@@ -339,8 +341,43 @@ function createCollectedContactsTable(resolve, reject) {
             logger.debug('Contacts seed notice: %s', seedErr.message);
           }
           logger.debug('SQLite collected_contacts table initialized and synced successfully.');
-          resolve();
+          createPaymentsTable(resolve, reject);
         });
+      });
+    });
+  });
+}
+
+function createPaymentsTable(resolve, reject) {
+  // 6. Create payments table for Razorpay transactions
+  db.run(`
+    CREATE TABLE IF NOT EXISTS payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL,
+      order_id TEXT NOT NULL UNIQUE,
+      payment_id TEXT,
+      signature TEXT,
+      amount INTEGER NOT NULL,
+      currency TEXT DEFAULT 'INR',
+      plan_id TEXT NOT NULL,
+      plan_name TEXT NOT NULL,
+      messages_allocated INTEGER NOT NULL,
+      status TEXT DEFAULT 'created',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+    )
+  `, (err) => {
+    if (err) {
+      logger.error('Failed to create payments table: %s', err.message);
+      return reject(err);
+    }
+    db.run('CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id)', (idxErr1) => {
+      if (idxErr1) logger.error('Error creating payments tenant index: %s', idxErr1.message);
+      db.run('CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id)', (idxErr2) => {
+        if (idxErr2) logger.error('Error creating payments order index: %s', idxErr2.message);
+        logger.debug('SQLite payments table initialized successfully.');
+        resolve();
       });
     });
   });
@@ -1042,6 +1079,122 @@ function getContactsCountByTenant(tenantId) {
   return Promise.resolve(0);
 }
 
+
+// Payment Database Helpers
+function recordPaymentOrder(tenantId, orderId, amount, planId, planName, messagesAllocated) {
+  return new Promise((resolve, reject) => {
+    if (!sqliteAvailable || !db) return resolve(null);
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    db.run(
+      `INSERT INTO payments (tenant_id, order_id, amount, plan_id, plan_name, messages_allocated, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'created', ?, ?)`,
+      [tenantId, orderId, amount, planId, planName, messagesAllocated, timestamp, timestamp],
+      function (err) {
+        if (err) {
+          logger.error('Failed to record payment order: %s', err.message);
+          return reject(err);
+        }
+        resolve({ id: this.lastID, orderId, status: 'created' });
+      }
+    );
+  });
+}
+
+function fulfillPaymentOrder(orderId, paymentId, signature) {
+  return new Promise((resolve, reject) => {
+    if (!sqliteAvailable || !db) return resolve(null);
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    db.get('SELECT * FROM payments WHERE order_id = ?', [orderId], async (err, payment) => {
+      if (err) return reject(err);
+      if (!payment) return reject(new Error('Order not found'));
+      if (payment.status === 'paid') return resolve(payment); // Idempotency check
+
+      // Calculate new 365-day expiry from today
+      const oneYearLater = new Date();
+      oneYearLater.setDate(oneYearLater.getDate() + 365);
+      const expiryDateStr = oneYearLater.toISOString().replace('T', ' ').substring(0, 19);
+
+      db.serialize(() => {
+        // 1. Update payment status
+        db.run(
+          `UPDATE payments SET payment_id = ?, signature = ?, status = 'paid', updated_at = ? WHERE order_id = ?`,
+          [paymentId, signature, timestamp, orderId],
+          (updateErr) => {
+            if (updateErr) logger.error('Failed to update payment record: %s', updateErr.message);
+          }
+        );
+
+        // 2. Unfreeze & upgrade tenant account
+        db.run(
+          `UPDATE tenants SET 
+             account_status = 'active', 
+             plan_status = 'paid', 
+             current_plan = ?, 
+             plan_expiry_date = ? 
+           WHERE tenant_id = ?`,
+          [payment.plan_id, expiryDateStr, payment.tenant_id],
+          (tenantErr) => {
+            if (tenantErr) logger.error('Failed to update tenant plan: %s', tenantErr.message);
+          }
+        );
+
+        // 3. Credit message allocation to tenant balance
+        addCredits(payment.tenant_id, payment.messages_allocated, `Razorpay Plan Purchase: ${payment.plan_name} (₹${payment.amount})`)
+          .then((updatedBalance) => {
+            resolve({
+              success: true,
+              tenantId: payment.tenant_id,
+              planId: payment.plan_id,
+              planName: payment.plan_name,
+              messagesAllocated: payment.messages_allocated,
+              expiryDate: expiryDateStr,
+              updatedBalance
+            });
+          })
+          .catch(reject);
+      });
+    });
+  });
+}
+
+function getPaymentsByTenant(tenantId) {
+  return new Promise((resolve, reject) => {
+    if (!sqliteAvailable || !db) return resolve([]);
+    db.all(
+      `SELECT * FROM payments WHERE tenant_id = ? ORDER BY id DESC`,
+      [tenantId],
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      }
+    );
+  });
+}
+
+// Global account freeze monitor: freezes tenants whose credits are 0 or 365 days expired
+function freezeExpiredTenants() {
+  return new Promise((resolve) => {
+    if (!sqliteAvailable || !db) return resolve();
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    // Freeze paid plans that exceeded their 365-day expiry date
+    db.run(
+      `UPDATE tenants 
+       SET account_status = 'frozen_expired' 
+       WHERE plan_status = 'paid' 
+         AND account_status = 'active' 
+         AND plan_expiry_date IS NOT NULL 
+         AND plan_expiry_date < ?`,
+      [now],
+      (err) => {
+        if (err) logger.error('Error auto-freezing expired plans: %s', err.message);
+        resolve();
+      }
+    );
+  });
+}
+
 module.exports = {
   init,
   isAvailable: () => sqliteAvailable,
@@ -1071,5 +1224,10 @@ module.exports = {
   getContactsByTenant,
   getAllContacts,
   getContactsCountByTenant,
+  recordPaymentOrder,
+  fulfillPaymentOrder,
+  getPaymentsByTenant,
+  freezeExpiredTenants,
   get dbInstance() { return db; }
 };
+

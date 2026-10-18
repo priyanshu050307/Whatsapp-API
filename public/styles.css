@@ -1170,3 +1170,363 @@ body.light-mode .user-profile-pill {
   background: rgba(255, 255, 255, 0.95);
   border-color: rgba(15, 23, 42, 0.10);
 }
+
+/* ==================== PRICING SECTION & CARDS (WATHOOLCAB DESIGN) ==================== */
+.pricing-section-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.pricing-brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.pricing-brand-logo {
+  width: 44px;
+  height: 44px;
+  background: #10b981;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.45);
+}
+
+.pricing-brand-logo i {
+  color: #ffffff;
+  font-size: 1.65rem;
+}
+
+.pricing-brand-title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 2.1rem;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin: 0;
+}
+
+.pricing-brand-title span {
+  color: #10b981;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.65rem;
+  margin-top: 2rem;
+}
+
+@media (max-width: 991px) {
+  .pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pricing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: 22px;
+  padding: 2.25rem 1.85rem 1.85rem 1.85rem;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background: rgba(14, 18, 30, 0.72);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+  overflow: hidden;
+  min-height: 450px;
+}
+
+.pricing-card:hover {
+  transform: translateY(-8px);
+}
+
+.pricing-badge {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.badge-trial {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+}
+
+.badge-popular {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(2, 132, 199, 0.45);
+}
+
+.badge-best-value {
+  background: #d97706;
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(217, 119, 6, 0.45);
+}
+
+.badge-max-power {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.45);
+}
+
+.pricing-card-header {
+  margin-bottom: 1.75rem;
+}
+
+.pricing-plan-name {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 0.65rem;
+  font-family: var(--font-body);
+}
+
+.pricing-price-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.pricing-amount {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.pricing-cycle {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: rgba(241, 245, 249, 0.75);
+}
+
+.pricing-messages-count {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(241, 245, 249, 0.85);
+  margin-top: 0.2rem;
+}
+
+.pricing-features-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.pricing-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #f1f5f9;
+}
+
+.pricing-feature-item i {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+}
+
+.pricing-btn {
+  display: block;
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.22s ease;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+/* Tier 1: Micro / Trial */
+.pricing-tier-trial {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.08) 0%, rgba(13, 17, 30, 0.8) 75%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.pricing-tier-trial:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 16px 45px rgba(255, 255, 255, 0.08);
+}
+.pricing-tier-trial .pricing-feature-item i {
+  color: #cbd5e1;
+}
+.pricing-tier-trial .pricing-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+.pricing-tier-trial .pricing-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Tier 2: Starter (Green) */
+.pricing-tier-starter {
+  border: 1.5px solid rgba(16, 185, 129, 0.55);
+  background: radial-gradient(ellipse at top, rgba(16, 185, 129, 0.18) 0%, rgba(10, 16, 24, 0.8) 80%);
+  box-shadow: 0 10px 35px rgba(16, 185, 129, 0.2), inset 0 0 30px rgba(16, 185, 129, 0.05);
+}
+.pricing-tier-starter:hover {
+  border-color: #10b981;
+  box-shadow: 0 18px 50px rgba(16, 185, 129, 0.35), inset 0 0 35px rgba(16, 185, 129, 0.1);
+}
+.pricing-tier-starter .pricing-feature-item i {
+  color: #10b981;
+}
+.pricing-tier-starter .pricing-btn {
+  background: rgba(16, 185, 129, 0.28);
+  border: 1px solid #10b981;
+  color: #ffffff;
+}
+.pricing-tier-starter .pricing-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);
+}
+
+/* Tier 3: Growth (Cyan / Electric Blue) */
+.pricing-tier-growth {
+  border: 1.5px solid rgba(14, 165, 233, 0.55);
+  background: radial-gradient(ellipse at top, rgba(14, 165, 233, 0.18) 0%, rgba(10, 16, 24, 0.8) 80%);
+  box-shadow: 0 10px 35px rgba(14, 165, 233, 0.2), inset 0 0 30px rgba(14, 165, 233, 0.05);
+}
+.pricing-tier-growth:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 18px 50px rgba(14, 165, 233, 0.35), inset 0 0 35px rgba(14, 165, 233, 0.1);
+}
+.pricing-tier-growth .pricing-feature-item i {
+  color: #38bdf8;
+}
+.pricing-tier-growth .pricing-btn {
+  background: rgba(14, 165, 233, 0.28);
+  border: 1px solid #0ea5e9;
+  color: #ffffff;
+}
+.pricing-tier-growth .pricing-btn:hover {
+  background: #0ea5e9;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.6);
+}
+
+/* Tier 4: Business (Purple / Violet) */
+.pricing-tier-business {
+  border: 1.5px solid rgba(168, 85, 247, 0.55);
+  background: radial-gradient(ellipse at top, rgba(168, 85, 247, 0.18) 0%, rgba(10, 16, 24, 0.8) 80%);
+  box-shadow: 0 10px 35px rgba(168, 85, 247, 0.2), inset 0 0 30px rgba(168, 85, 247, 0.05);
+}
+.pricing-tier-business:hover {
+  border-color: #a855f7;
+  box-shadow: 0 18px 50px rgba(168, 85, 247, 0.35), inset 0 0 35px rgba(168, 85, 247, 0.1);
+}
+.pricing-tier-business .pricing-feature-item i {
+  color: #c084fc;
+}
+.pricing-tier-business .pricing-btn {
+  background: rgba(168, 85, 247, 0.28);
+  border: 1px solid #a855f7;
+  color: #ffffff;
+}
+.pricing-tier-business .pricing-btn:hover {
+  background: #a855f7;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.6);
+}
+
+/* Tier 5: Pro Trader (Amber / Warm Gold) */
+.pricing-tier-pro {
+  border: 1.5px solid rgba(245, 158, 11, 0.55);
+  background: radial-gradient(ellipse at top, rgba(245, 158, 11, 0.18) 0%, rgba(10, 16, 24, 0.8) 80%);
+  box-shadow: 0 10px 35px rgba(245, 158, 11, 0.2), inset 0 0 30px rgba(245, 158, 11, 0.05);
+}
+.pricing-tier-pro:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 18px 50px rgba(245, 158, 11, 0.35), inset 0 0 35px rgba(245, 158, 11, 0.1);
+}
+.pricing-tier-pro .pricing-feature-item i {
+  color: #fbbf24;
+}
+.pricing-tier-pro .pricing-btn {
+  background: rgba(245, 158, 11, 0.28);
+  border: 1px solid #f59e0b;
+  color: #ffffff;
+}
+.pricing-tier-pro .pricing-btn:hover {
+  background: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+}
+
+/* Tier 6: Enterprise Max (Ruby / Crimson Red) */
+.pricing-tier-enterprise {
+  border: 1.5px solid rgba(239, 68, 68, 0.55);
+  background: radial-gradient(ellipse at top, rgba(239, 68, 68, 0.18) 0%, rgba(10, 16, 24, 0.8) 80%);
+  box-shadow: 0 10px 35px rgba(239, 68, 68, 0.2), inset 0 0 30px rgba(239, 68, 68, 0.05);
+}
+.pricing-tier-enterprise:hover {
+  border-color: #ef4444;
+  box-shadow: 0 18px 50px rgba(239, 68, 68, 0.35), inset 0 0 35px rgba(239, 68, 68, 0.1);
+}
+.pricing-tier-enterprise .pricing-feature-item i {
+  color: #f87171;
+}
+.pricing-tier-enterprise .pricing-btn {
+  background: rgba(239, 68, 68, 0.28);
+  border: 1px solid #ef4444;
+  color: #ffffff;
+}
+.pricing-tier-enterprise .pricing-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+}
+
+/* Light mode adjustments for pricing */
+body.light-mode .pricing-card {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+body.light-mode .pricing-plan-name,
+body.light-mode .pricing-amount,
+body.light-mode .pricing-feature-item {
+  color: #0f172a !important;
+}
+body.light-mode .pricing-cycle,
+body.light-mode .pricing-messages-count {
+  color: #475569 !important;
+}
+body.light-mode .pricing-tier-trial {
+  border-color: rgba(15, 23, 42, 0.15);
+}
+body.light-mode .pricing-tier-trial .pricing-btn {
+  background: #0f172a;
+  color: #ffffff;
+}

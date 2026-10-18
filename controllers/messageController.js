@@ -15,11 +15,15 @@ exports.sendMessage = async (req, res) => {
   if (!balance || balance.remaining_credits <= 0) {
     const receiverMobileNo = req.query.receiverMobileNo || req.body.receiverMobileNo || 'unknown';
     const messageText = req.query.message || req.body.message || '';
-    await logService.logWhatsAppMessage(tenantId, receiverMobileNo, messageText, 'failed', 'Insufficient message credits');
+    await logService.logWhatsAppMessage(tenantId, receiverMobileNo, messageText, 'failed', 'Insufficient message credits - Account Frozen');
     
+    // Automatically flag account status as frozen_credits
+    await db.updateTenantStatus(tenantId, 'frozen_credits');
+
     return res.status(402).json({
       status: 'failed',
-      reason: `Insufficient message credits. Balance: ${balance ? balance.remaining_credits : 0}. Please contact administration for a recharge.`
+      reason: `Account Frozen: Insufficient message credits. Balance: ${balance ? balance.remaining_credits : 0}. Please repurchase a subscription plan to continue messaging.`,
+      isFrozen: true
     });
   }
 

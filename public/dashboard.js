@@ -265,7 +265,33 @@ function logout() {
   state.waStatus = 'DISCONNECTED';
   localStorage.removeItem('wa_gateway_token');
   localStorage.removeItem('wa_gateway_is_admin');
+
+  // Dismiss and clean up Account Frozen Modal & backdrop if open
+  closeFrozenModal();
+
   showAuthOverlay();
+}
+
+function closeFrozenModal() {
+  const modalEl = document.getElementById('accountFrozenModal');
+  if (modalEl) {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl) || frozenModalInstance;
+      if (modalInstance) {
+        modalInstance.hide();
+      }
+    }
+    modalEl.classList.remove('show');
+    modalEl.style.display = 'none';
+    modalEl.setAttribute('aria-hidden', 'true');
+    modalEl.removeAttribute('aria-modal');
+  }
+
+  // Remove any lingering Bootstrap modal-backdrop elements & body lock classes
+  document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+  document.body.classList.remove('modal-open');
+  document.body.style.removeProperty('overflow');
+  document.body.style.removeProperty('padding-right');
 }
 
 function showAuthOverlay() {
@@ -557,6 +583,9 @@ function renderClientDashboard(data) {
     remainingBadge.innerText = 'Trial Expired';
     remainingBadge.className = 'badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 fs-6 px-3 py-2';
   }
+
+  // Handle Account Freezing & Repurchase Modal
+  handleFrozenStateCheck(client, credits);
 
   // WhatsApp Connection Card
   const dot = document.getElementById('clientWaDot');
@@ -1321,6 +1350,21 @@ function setupEventListeners() {
     landingContactForm.onsubmit = handleContactSubmit;
   }
 
+  // Bind pricing card "Get Started" buttons
+  document.querySelectorAll('.btn-pricing-select').forEach(btn => {
+    btn.onclick = () => {
+      openLoginOverlay();
+    };
+  });
+
+  // Check URL query parameters for plan pre-selection or direct sign-in triggers
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('plan') || window.location.hash === '#login') {
+    if (!state.token) {
+      openLoginOverlay();
+    }
+  }
+
   // Theme Toggle click handlers
   const btnThemeToggleLanding = document.getElementById('btnThemeToggleLanding');
   if (btnThemeToggleLanding) {
@@ -1777,3 +1821,172 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+/* ==================== RAZORPAY INTEGRATION & AUTO-FREEZE LOGIC ==================== */
+
+let frozenModalInstance = null;
+
+function handleFrozenStateCheck(client, credits) {
+  if (!state.token) {
+    closeFrozenModal();
+    return;
+  }
+
+  const modalEl = document.getElementById('accountFrozenModal');
+  if (!modalEl) return;
+
+  const reasonEl = document.getElementById('frozenReasonText');
+  const isFrozen = client.is_frozen || 
+                   client.account_status === 'frozen_credits' || 
+                   client.account_status === 'frozen_expired' || 
+                   (credits && credits.remaining <= 0);
+
+  if (isFrozen) {
+    if (client.account_status === 'frozen_expired') {
+      reasonEl.innerText = 'Your 365-day annual subscription plan has expired.';
+    } else if (credits && credits.remaining <= 0) {
+      reasonEl.innerText = 'Your message credits have completed (Balance: 0). Repurchase any plan to continue.';
+    } else {
+      reasonEl.innerText = 'Your trial or subscription has ended. Choose a plan to unfreeze your gateway.';
+    }
+
+    if (!frozenModalInstance) {
+      frozenModalInstance = new bootstrap.Modal(modalEl, {
+        backdrop: 'static',
+        keyboard: false
+      });
+    }
+    frozenModalInstance.show();
+  } else if (frozenModalInstance) {
+    frozenModalInstance.hide();
+  }
+}
+
+/**
+ * Initiates Razorpay Checkout Modal
+ */
+async function initiateRazorpayCheckout(planId) {
+  if (!state.token) {
+    openLoginOverlay();
+    return;
+  }
+
+  try {
+    // 1. Request Order Creation from Backend
+    const orderRes = await fetch('/api/payment/create-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.token}`
+      },
+      body: JSON.stringify({ planId })
+    });
+
+    const orderData = await orderRes.json();
+    if (orderRes.status !== 200 || orderData.status !== 'success') {
+      alert('Order Creation Failed: ' + (orderData.reason || 'Please try again.'));
+      return;
+    }
+
+    const { order, client } = orderData;
+
+    // 2. Configure Razorpay Checkout Options
+    const options = {
+      key: order.keyId,
+      amount: order.amount * 100, // paise
+      currency: 'INR',
+      name: 'WaToolcab',
+      description: `${order.planName} Annual Plan (${order.messages.toLocaleString()} msgs)`,
+      image: '/favicon.ico',
+      order_id: order.orderId,
+      prefill: {
+        name: client.name || '',
+        email: client.email || '',
+        contact: client.mobile || ''
+      },
+      theme: {
+        color: '#10b981' // Emerald brand color
+      },
+      handler: async function (response) {
+        // 3. User paid successfully -> Verify signature on backend
+        await verifyRazorpayPayment({
+          orderId: response.razorpay_order_id,
+          paymentId: response.razorpay_payment_id,
+          signature: response.razorpay_signature
+        });
+      },
+      modal: {
+        ondismiss: function () {
+          console.log('[Razorpay] Checkout modal dismissed by user.');
+        }
+      }
+    };
+
+    if (typeof Razorpay === 'undefined') {
+      alert('Razorpay Checkout SDK is loading. Please check your internet connection and try again.');
+      return;
+    }
+
+    const rzp = new Razorpay(options);
+    rzp.on('payment.failed', function (response) {
+      alert('Payment Failed: ' + (response.error.description || 'Transaction unsuccessful'));
+    });
+    rzp.open();
+  } catch (err) {
+    console.error('Razorpay Error:', err);
+    alert('Payment Initiation Error: ' + err.message);
+  }
+}
+
+/**
+ * Verifies Razorpay payment signature and unfreezes account
+ */
+async function verifyRazorpayPayment(payload) {
+  try {
+    const verifyRes = await fetch('/api/payment/verify-payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await verifyRes.json();
+    if (verifyRes.status === 200 && data.status === 'success') {
+      alert(`🎉 Payment Successful!\n\nYour account is now ACTIVE with ${data.fulfillment.messagesAllocated.toLocaleString()} WhatsApp messages valid for 1 full year.`);
+      
+      // Close frozen modal
+      if (frozenModalInstance) {
+        frozenModalInstance.hide();
+      }
+
+      // Refresh live dashboard immediately
+      await fetchClientDashboardData();
+    } else {
+      alert('Payment Verification Failed: ' + (data.reason || 'Contact support.'));
+    }
+  } catch (err) {
+    alert('Verification Error: ' + err.message);
+  }
+}
+
+// Bind Checkout click listeners to both landing page, pricing page, and frozen modal
+document.addEventListener('click', (e) => {
+  const checkoutBtn = e.target.closest('.btn-checkout-razorpay, .btn-pricing-select');
+  if (checkoutBtn) {
+    e.preventDefault();
+    const plan = checkoutBtn.getAttribute('data-plan') || 'starter';
+    if (!state.token) {
+      // Prompt user to sign in first, then resume plan purchase
+      openLoginOverlay();
+    } else {
+      initiateRazorpayCheckout(plan);
+    }
+  }
+
+  if (e.target.closest('#btnSignOutFromFrozen')) {
+    logout();
+  }
+});
+

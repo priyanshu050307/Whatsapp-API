@@ -14,6 +14,7 @@ const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const whatsappService = require('./services/whatsapp');
 const socketService = require('./services/socketService');
 const db = require('./services/db');
@@ -76,8 +77,14 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/client', clientRoutes);
 app.use('/api/whatsapp', chatRoutes); // Mounts live WhatsApp Web chat routes
+app.use('/api/payment', paymentRoutes); // Mounts Razorpay payment routes
 app.use('/message', messageRoutes);   // Mounts /message/new GET and POST
 app.use('/', systemRoutes);            // Mounts /status, /qr, /logout, /restart, /api/logs, /api/config
+
+// Dedicated route for Pricing page
+app.get('/pricing', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'pricing.html'));
+});
 
 // Fallback to index.html for dashboard routing
 app.get('*', (req, res, next) => {
@@ -165,4 +172,4 @@ async function gracefulShutdown() {
   }
 }
 
-module.exports = { app, server, gracefulShutdown };
+module.exports = { app, server, gracefulShutdown };

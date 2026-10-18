@@ -24,7 +24,9 @@ const getDefaults = () => ({
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || '',
   FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET || '',
   FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
-  FIREBASE_APP_ID: process.env.FIREBASE_APP_ID || ''
+  FIREBASE_APP_ID: process.env.FIREBASE_APP_ID || '',
+  RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || 'rzp_live_TCS1rtRLEUCNtj',
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || 'x90x2I3C6cvgA8s0sAGnH0QZ'
 });
 
 let currentConfig = { ...getDefaults() };

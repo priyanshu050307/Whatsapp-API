@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing Plans — WaToolcab WhatsApp Business API Gateway</title>
+  
+  <!-- Google Fonts & Bootstrap 5 & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/styles.css?v=1.0.6">
+
+  <!-- Razorpay Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+  <!-- ==================== NAVBAR ==================== -->
+  <nav class="navbar navbar-expand-lg border-bottom border-secondary border-opacity-10 py-3 sticky-top landing-navbar">
+    <div class="container">
+      <div class="d-flex align-items-center gap-3">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-light" href="/">
+          <div class="pricing-brand-logo" style="width: 36px; height: 36px;">
+            <i class="bi bi-whatsapp fs-5"></i>
+          </div>
+          <span class="brand-name fs-4">WaToolcab</span>
+        </a>
+        <a href="/#login" class="btn btn-success btn-success-glow btn-sm px-3 py-2 fw-semibold fs-8 text-decoration-none">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+        </a>
+        <button id="btnThemeTogglePricing" class="btn btn-outline-secondary border-0 rounded-circle p-2 d-flex align-items-center justify-content-center" title="Toggle Light/Dark Mode" style="width: 38px; height: 38px; color: var(--text-secondary);">
+          <i class="bi bi-sun-fill theme-toggle-icon fs-5"></i>
+        </button>
+      </div>
+      
+      <button class="navbar-toggler border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#pricingNavContent">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="pricingNavContent">
+        <ul class="navbar-nav ms-auto mb-2 mb-lg-0 gap-2 fs-7 text-center">
+          <li class="nav-item">
+            <a class="nav-link text-secondary" href="/">Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-secondary" href="/#features">Features</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-success fw-bold active" href="/pricing">Pricing</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-secondary" href="/#about">About Us</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-secondary" href="/#contact">Contact Us</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO PRICING HEADER ==================== -->
+  <section class="py-5 position-relative overflow-hidden">
+    <div class="container py-4 text-center position-relative z-1">
+      <div class="pricing-brand-header mb-3">
+        <div class="pricing-brand-logo">
+          <i class="bi bi-whatsapp"></i>
+        </div>
+        <h1 class="pricing-brand-title">Wa<span>Toolcab</span></h1>
+      </div>
+      <p class="lead text-secondary mx-auto mb-2 fs-6" style="max-width: 680px;">
+        Transparent, predictable annual pricing for Busy Accounting Software, ERPs, and custom API integrations.
+      </p>
+      <div class="d-inline-flex flex-wrap justify-content-center align-items-center gap-2 mt-2">
+        <span class="px-3 py-1.5 rounded-pill bg-success bg-opacity-10 border border-success border-opacity-20 text-success fs-8 fw-semibold">
+          <i class="bi bi-check2-circle"></i> All Plans Valid for 1 Full Year (365 Days) · Zero Setup Fees
+        </span>
+        <button class="btn btn-sm btn-outline-warning btn-checkout-razorpay rounded-pill px-3 py-1 fs-8 fw-bold" data-plan="test1" title="Test instant Razorpay payment with 1 Rupee">
+          <i class="bi bi-lightning-charge-fill me-1"></i> Quick Test: ₹1 (1 Msg)
+        </button>
+      </div>
+
+      <!-- ==================== PRICING 6 CARDS GRID ==================== -->
+      <div class="pricing-grid text-start">
+        
+        <!-- CARD 1: Micro / Trial -->
+        <div class="pricing-card pricing-tier-trial">
+          <span class="pricing-badge badge-trial">Trial</span>
+          <div>
+            <div class="pricing-card-header">
+              <div class="pricing-plan-name">Micro / Trial</div>
+              <div class="pricing-price-wrap">
+                <span class="pricing-amount">₹499</span>
+                <span class="pricing-cycle">/yr</span>
+              </div>
+              <div class="pricing-messages-count">1,000 messages</div>
+            </div>
+
+            <ul class="pricing-features-list">
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>1 WhatsApp Number</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>PDF & Text Invoice Delivery</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Basic Delivery Logs</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Free Customer Support.</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="pricing-btn btn-checkout-razorpay" data-plan="micro">Get Started</button>
+        </div>
+
+        <!-- CARD 2: Starter -->
+        <div class="pricing-card pricing-tier-starter">
+          <div>
+            <div class="pricing-card-header">
+              <div class="pricing-plan-name">Starter</div>
+              <div class="pricing-price-wrap">
+                <span class="pricing-amount">₹999</span>
+                <span class="pricing-cycle">/yr</span>
+              </div>
+              <div class="pricing-messages-count">2,500 messages</div>
+            </div>
+
+            <ul class="pricing-features-list">
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>1 WhatsApp Number</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>PDF & Text Invoice Delivery</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Basic Delivery Logs</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Free Customer Support.</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="pricing-btn btn-checkout-razorpay" data-plan="starter">Get Started</button>
+        </div>
+
+        <!-- CARD 3: Growth -->
+        <div class="pricing-card pricing-tier-growth">
+          <span class="pricing-badge badge-popular">Popular</span>
+          <div>
+            <div class="pricing-card-header">
+              <div class="pricing-plan-name">Growth</div>
+              <div class="pricing-price-wrap">
+                <span class="pricing-amount">₹1,499</span>
+                <span class="pricing-cycle">/yr</span>
+              </div>
+              <div class="pricing-messages-count">4,500 messages</div>
+            </div>
+
+            <ul class="pricing-features-list">
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>1 WhatsApp Number</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>PDF & Text Invoice Delivery</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Basic Delivery Logs</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Free Customer Support.</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="pricing-btn btn-checkout-razorpay" data-plan="growth">Get Started</button>
+        </div>
+
+        <!-- CARD 4: Business -->
+        <div class="pricing-card pricing-tier-business">
+          <div>
+            <div class="pricing-card-header">
+              <div class="pricing-plan-name">Business</div>
+              <div class="pricing-price-wrap">
+                <span class="pricing-amount">₹1,999</span>
+                <span class="pricing-cycle">/yr</span>
+              </div>
+              <div class="pricing-messages-count">6,500 messages</div>
+            </div>
+
+            <ul class="pricing-features-list">
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>1 WhatsApp Number</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>PDF & Text Invoice Delivery</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Basic Delivery Logs</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Free Customer Support.</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="pricing-btn btn-checkout-razorpay" data-plan="business">Get Started</button>
+        </div>
+
+        <!-- CARD 5: Pro Trader -->
+        <div class="pricing-card pricing-tier-pro">
+          <span class="pricing-badge badge-best-value">Best Value</span>
+          <div>
+            <div class="pricing-card-header">
+              <div class="pricing-plan-name">Pro Trader</div>
+              <div class="pricing-price-wrap">
+                <span class="pricing-amount">₹2,499</span>
+                <span class="pricing-cycle">/yr</span>
+              </div>
+              <div class="pricing-messages-count">8,500 messages</div>
+            </div>
+
+            <ul class="pricing-features-list">
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>1 WhatsApp Number</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>PDF & Text Invoice Delivery</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Basic Delivery Logs</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Free Customer Support.</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="pricing-btn btn-checkout-razorpay" data-plan="pro">Get Started</button>
+        </div>
+
+        <!-- CARD 6: Enterprise Max -->
+        <div class="pricing-card pricing-tier-enterprise">
+          <span class="pricing-badge badge-max-power">Max Power</span>
+          <div>
+            <div class="pricing-card-header">
+              <div class="pricing-plan-name">Enterprise Max</div>
+              <div class="pricing-price-wrap">
+                <span class="pricing-amount">₹2,999</span>
+                <span class="pricing-cycle">/yr</span>
+              </div>
+              <div class="pricing-messages-count">10,000 messages</div>
+            </div>
+
+            <ul class="pricing-features-list">
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>1 WhatsApp Number</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>PDF & Text Invoice Delivery</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Basic Delivery Logs</span>
+              </li>
+              <li class="pricing-feature-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Free Customer Support.</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="pricing-btn btn-checkout-razorpay" data-plan="enterprise">Get Started</button>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FREQUENTLY ASKED QUESTIONS ==================== -->
+  <section class="py-5 border-top border-secondary border-opacity-10 bg-black bg-opacity-20">
+    <div class="container py-4" style="max-width: 860px;">
+      <div class="text-center mb-5">
+        <span class="text-success fs-8 fw-bold uppercase tracking-wider">QUESTIONS & ANSWERS</span>
+        <h2 class="fw-bold text-light mt-1">Frequently Asked Questions</h2>
+        <p class="text-secondary fs-7 mt-2">Everything you need to know about our billing and plans.</p>
+      </div>
+
+      <div class="accordion" id="faqAccordion">
+        <div class="accordion-item glass-card border-0 mb-3 overflow-hidden">
+          <h2 class="accordion-header" id="faqHeading1">
+            <button class="accordion-button collapsed bg-transparent text-light fw-semibold fs-7 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse1">
+              <i class="bi bi-calendar3 text-success me-2"></i> How long are the message credits valid?
+            </button>
+          </h2>
+          <div id="faqCollapse1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+            <div class="accordion-body text-secondary fs-7 pt-0">
+              All plans come with a complete <strong>365-day (1 full year) validity</strong> from the date of activation. Unused messages do not expire at the end of each month; they remain active in your account for the entire year.
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item glass-card border-0 mb-3 overflow-hidden">
+          <h2 class="accordion-header" id="faqHeading2">
+            <button class="accordion-button collapsed bg-transparent text-light fw-semibold fs-7 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse2">
+              <i class="bi bi-file-earmark-pdf text-success me-2"></i> Does it support Busy Accounting Software invoice PDFs?
+            </button>
+          </h2>
+          <div id="faqCollapse2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+            <div class="accordion-body text-secondary fs-7 pt-0">
+              Yes, 100%! WaToolcab has native HTTP endpoint support designed specifically for Busy Accounting Software, Tally, and custom ERPs. You can dispatch both plain text reminders and rich PDF invoices directly to customer WhatsApp numbers.
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item glass-card border-0 mb-3 overflow-hidden">
+          <h2 class="accordion-header" id="faqHeading3">
+            <button class="accordion-button collapsed bg-transparent text-light fw-semibold fs-7 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse3">
+              <i class="bi bi-arrow-repeat text-success me-2"></i> What happens if I finish my message limit before 1 year?
+            </button>
+          </h2>
+          <div id="faqCollapse3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+            <div class="accordion-body text-secondary fs-7 pt-0">
+              You can recharge instant credit top-up packs or upgrade to a higher tier anytime from your client dashboard without losing your linked WhatsApp session.
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item glass-card border-0 mb-3 overflow-hidden">
+          <h2 class="accordion-header" id="faqHeading4">
+            <button class="accordion-button collapsed bg-transparent text-light fw-semibold fs-7 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse4">
+              <i class="bi bi-shield-check text-success me-2"></i> Are my messages and WhatsApp session private and secure?
+            </button>
+          </h2>
+          <div id="faqCollapse4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+            <div class="accordion-body text-secondary fs-7 pt-0">
+              Yes. Each tenant operates inside an isolated, containerized session sandbox. We do not store your private chat history or customer contacts — our gateway only handles asynchronous message transmission with natural anti-spam throttling.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="py-4 border-top border-secondary border-opacity-10 text-center fs-8 text-secondary">
+    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-whatsapp text-success fs-5"></i>
+        <span>© 2026 WaToolcab. All rights reserved.</span>
+      </div>
+      <div class="d-flex gap-3">
+        <a href="/" class="text-secondary text-decoration-none">Home</a>
+        <a href="/pricing" class="text-secondary text-decoration-none text-light fw-semibold">Pricing</a>
+        <a href="/#about" class="text-secondary text-decoration-none">About</a>
+        <a href="/#contact" class="text-secondary text-decoration-none">Contact Support</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Theme toggle handling for pricing page
+    const themeBtn = document.getElementById('btnThemeTogglePricing');
+    function applySavedTheme() {
+      const theme = localStorage.getItem('wa_gateway_theme') || 'dark';
+      const icon = themeBtn.querySelector('.theme-toggle-icon');
+      if (theme === 'light') {
+        document.body.classList.add('light-mode');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+        if (icon) icon.className = 'bi bi-moon-fill theme-toggle-icon';
+      } else {
+        document.body.classList.remove('light-mode');
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+        if (icon) icon.className = 'bi bi-sun-fill theme-toggle-icon';
+      }
+    }
+    applySavedTheme();
+
+    if (themeBtn) {
+      themeBtn.onclick = () => {
+        const isLight = document.body.classList.toggle('light-mode');
+        const theme = isLight ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-bs-theme', theme);
+        localStorage.setItem('wa_gateway_theme', theme);
+        applySavedTheme();
+      };
+    }
+
+    // Redirect to home dashboard with plan selected
+    document.querySelectorAll('.btn-checkout-razorpay').forEach(btn => {
+      btn.onclick = (e) => {
+        const plan = e.currentTarget.getAttribute('data-plan') || 'starter';
+        window.location.href = `/?plan=${encodeURIComponent(plan)}`;
+      };
+    });
+  </script>
+</body>
+</html>

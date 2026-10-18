@@ -61,7 +61,9 @@ const helmetMiddleware = helmet({
         "https://www.gstatic.com", 
         "https://apis.google.com",
         "https://accounts.google.com",
-        "https://*.firebaseapp.com"
+        "https://*.firebaseapp.com",
+        "https://checkout.razorpay.com",
+        "https://*.razorpay.com"
       ],
       styleSrc: [
         "'self'", 
@@ -81,7 +83,8 @@ const helmetMiddleware = helmet({
         "blob:", 
         "https://*.googleusercontent.com",
         "https://*.gravatar.com",
-        "https://*.firebasestorage.app"
+        "https://*.firebasestorage.app",
+        "https://*.razorpay.com"
       ],
       connectSrc: [
         "'self'", 
@@ -95,12 +98,17 @@ const helmetMiddleware = helmet({
         "https://www.gstatic.com",
         "https://apis.google.com",
         "https://accounts.google.com",
-        "https://*.googleapis.com"
+        "https://*.googleapis.com",
+        "https://api.razorpay.com",
+        "https://*.razorpay.com"
       ],
       frameSrc: [
         "'self'", 
         "https://*.firebaseapp.com",
-        "https://accounts.google.com"
+        "https://accounts.google.com",
+        "https://api.razorpay.com",
+        "https://checkout.razorpay.com",
+        "https://*.razorpay.com"
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"]

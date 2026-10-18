@@ -96,12 +96,26 @@ module.exports = async (req, res, next) => {
     });
   }
 
+  // Account Frozen due to plan completion / expiry
+  if (tenant.account_status === 'frozen_expired' || tenant.account_status === 'frozen_credits') {
+    const fullUrl = req.originalUrl || req.url || req.path;
+    const isPaymentEndpoint = fullUrl.startsWith('/api/payment') || fullUrl.startsWith('/api/client/dashboard') || fullUrl === '/status';
+    if (!isPaymentEndpoint) {
+      return res.status(402).json({
+        status: 'failed',
+        reason: 'Account Frozen: Your subscription plan or message credits have completed. Please repurchase a plan to unfreeze your account.',
+        isFrozen: true
+      });
+    }
+  }
+
   // Restrict message sending if trial is expired and plan is not active
   const isMessageEndpoint = req.path.includes('/message');
   if (isMessageEndpoint && tenant.account_status === 'expired' && tenant.plan_status !== 'paid' && tenant.plan_status !== 'active') {
     return res.status(402).json({
       status: 'failed',
-      reason: 'Trial Expired: Your 15-day free trial has expired. Please upgrade your subscription plan to send WhatsApp messages.'
+      reason: 'Trial Expired: Your 15-day free trial has expired. Please upgrade your subscription plan to send WhatsApp messages.',
+      isFrozen: true
     });
   }
 

@@ -31,6 +31,23 @@ exports.getDashboard = async (req, res) => {
     const expiry = tenant.trial_expiry_date ? new Date(tenant.trial_expiry_date) : now;
     const remainingDays = Math.max(0, Math.ceil((expiry - now) / (1000 * 60 * 60 * 24)));
 
+    // Auto-detect freeze condition: credits <= 0 OR plan expiry date in past
+    let accountStatus = tenant.account_status || 'trial';
+    if (balance && balance.remaining_credits <= 0 && accountStatus !== 'suspended') {
+      accountStatus = 'frozen_credits';
+    } else if (tenant.plan_status === 'paid' && tenant.plan_expiry_date && new Date(tenant.plan_expiry_date) < now && accountStatus !== 'suspended') {
+      accountStatus = 'frozen_expired';
+    } else if (tenant.plan_status === 'free_trial' && remainingDays <= 0 && accountStatus !== 'suspended') {
+      accountStatus = 'expired';
+    }
+
+    // Sync status in DB if changed
+    if (accountStatus !== tenant.account_status && accountStatus.startsWith('frozen')) {
+      await db.updateTenantStatus(tenantId, accountStatus);
+    }
+
+    const isFrozen = accountStatus === 'frozen_credits' || accountStatus === 'frozen_expired' || accountStatus === 'expired';
+
     return res.status(200).json({
       status: 'success',
       client: {
@@ -42,8 +59,11 @@ exports.getDashboard = async (req, res) => {
         trial_start_date: tenant.trial_start_date || tenant.signup_date,
         trial_expiry_date: tenant.trial_expiry_date,
         remaining_trial_days: remainingDays,
-        account_status: tenant.account_status || 'trial',
+        account_status: accountStatus,
         plan_status: tenant.plan_status || 'free_trial',
+        current_plan: tenant.current_plan || 'trial',
+        plan_expiry_date: tenant.plan_expiry_date || null,
+        is_frozen: isFrozen,
         api_credentials: {
           username: tenant.username,
           password: tenant.password,
