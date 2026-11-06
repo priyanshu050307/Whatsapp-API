@@ -80,6 +80,9 @@
         <span class="px-3 py-1.5 rounded-pill bg-success bg-opacity-10 border border-success border-opacity-20 text-success fs-8 fw-semibold">
           <i class="bi bi-check2-circle"></i> All Plans Valid for 1 Full Year (365 Days) · Zero Setup Fees
         </span>
+        <button class="btn btn-sm btn-outline-info btn-start-trial rounded-pill px-3 py-1 fs-8 fw-bold" title="Activate 15-Day Free Trial with 100 free messages">
+          <i class="bi bi-gift-fill me-1"></i> Start 15-Day Free Trial
+        </button>
         <button class="btn btn-sm btn-outline-warning btn-checkout-razorpay rounded-pill px-3 py-1 fs-8 fw-bold" data-plan="test1" title="Test instant Razorpay payment with 1 Rupee">
           <i class="bi bi-lightning-charge-fill me-1"></i> Quick Test: ₹1 (1 Msg)
         </button>
@@ -387,7 +390,6 @@
     </div>
   </footer>
 
-  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // Theme toggle handling for pricing page
@@ -417,11 +419,19 @@
       };
     }
 
-    // Redirect to home dashboard with plan selected
+    // "Get Started" / Purchase buttons: redirect to /?plan=X
+    // dashboard.js will then detect ?plan in URL and fire Razorpay checkout immediately (after login if needed)
     document.querySelectorAll('.btn-checkout-razorpay').forEach(btn => {
       btn.onclick = (e) => {
         const plan = e.currentTarget.getAttribute('data-plan') || 'starter';
         window.location.href = `/?plan=${encodeURIComponent(plan)}`;
+      };
+    });
+
+    // "Start 15-Day Free Trial" button: redirect to dashboard to activate trial
+    document.querySelectorAll('.btn-start-trial').forEach(btn => {
+      btn.onclick = () => {
+        window.location.href = '/?start_trial=1';
       };
     });
   </script>

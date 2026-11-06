@@ -99,7 +99,7 @@ module.exports = async (req, res, next) => {
   // Account Frozen due to plan completion / expiry
   if (tenant.account_status === 'frozen_expired' || tenant.account_status === 'frozen_credits') {
     const fullUrl = req.originalUrl || req.url || req.path;
-    const isPaymentEndpoint = fullUrl.startsWith('/api/payment') || fullUrl.startsWith('/api/client/dashboard') || fullUrl === '/status';
+    const isPaymentEndpoint = fullUrl.startsWith('/api/payment') || fullUrl.startsWith('/api/client') || fullUrl === '/status';
     if (!isPaymentEndpoint) {
       return res.status(402).json({
         status: 'failed',
@@ -110,8 +110,15 @@ module.exports = async (req, res, next) => {
   }
 
   // Restrict message sending if trial is expired and plan is not active
-  const isMessageEndpoint = req.path.includes('/message');
-  if (isMessageEndpoint && tenant.account_status === 'expired' && tenant.plan_status !== 'paid' && tenant.plan_status !== 'active') {
+  const isMessageEndpoint = req.path.includes('/message') || req.path.includes('/send');
+  if (isMessageEndpoint && tenant.plan_status !== 'paid' && tenant.plan_status !== 'active') {
+    if (tenant.account_status === 'pending') {
+      return res.status(403).json({
+        status: 'failed',
+        reason: 'Free Trial Not Started: Please click "Start 15-Day Free Trial" or purchase a plan to begin sending WhatsApp messages.',
+        needsActivation: true
+      });
+    }
     return res.status(402).json({
       status: 'failed',
       reason: 'Trial Expired: Your 15-day free trial has expired. Please upgrade your subscription plan to send WhatsApp messages.',

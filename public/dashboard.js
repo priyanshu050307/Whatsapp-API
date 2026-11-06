@@ -41,6 +41,15 @@ function initApp() {
         showAdminDashboard();
       } else {
         showClientDashboard();
+        // If already logged in and ?plan=X is in URL, trigger Razorpay immediately
+        const urlParams = new URLSearchParams(window.location.search);
+        const planFromUrl = urlParams.get('plan');
+        const startTrialFromUrl = urlParams.get('start_trial') === '1';
+        if (planFromUrl) {
+          setTimeout(() => initiateRazorpayCheckout(planFromUrl), 1200);
+        } else if (startTrialFromUrl) {
+          setTimeout(() => activateFreeTrial(), 1200);
+        }
       }
     }
   } else {
@@ -201,6 +210,19 @@ async function performGoogleLogin(payload) {
       localStorage.setItem('wa_gateway_is_admin', 'false');
 
       showClientDashboard();
+
+      // CRITICAL: If user came from pricing page with a plan pre-selected, go straight to Razorpay
+      const urlParams = new URLSearchParams(window.location.search);
+      const planFromUrl = urlParams.get('plan') || sessionStorage.getItem('wa_pending_plan');
+      const startTrial = urlParams.get('start_trial') === '1' || sessionStorage.getItem('wa_pending_action') === 'start_trial';
+      if (planFromUrl) {
+        sessionStorage.removeItem('wa_pending_plan');
+        // Small delay to let dashboard render first
+        setTimeout(() => initiateRazorpayCheckout(planFromUrl), 800);
+      } else if (startTrial) {
+        sessionStorage.removeItem('wa_pending_action');
+        setTimeout(() => activateFreeTrial(), 800);
+      }
     } else {
       showAuthAlert('clientAuthAlert', 'Google Login Failed: ' + (data.reason || 'Unknown authentication error'));
     }
@@ -560,28 +582,104 @@ function renderClientDashboard(data) {
   }
 
   // 15-Day Trial & Plan Status Banner
-  document.getElementById('trialExpiryDateText').innerText = client.trial_expiry_date || 'N/A';
+  const trialBanner = document.getElementById('trialStatusBanner');
+  const trialExpiryEl = document.getElementById('trialExpiryDateText');
+  if (trialExpiryEl) trialExpiryEl.innerText = client.trial_expiry_date || 'N/A';
   
   const statusBadge = document.getElementById('accountStatusBadge');
-  statusBadge.innerText = (client.account_status || 'trial').toUpperCase();
+  statusBadge.innerText = (client.account_status || 'pending').toUpperCase();
   if (client.account_status === 'trial') {
     statusBadge.className = 'badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 fs-8';
   } else if (client.account_status === 'active') {
     statusBadge.className = 'badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-8';
   } else if (client.account_status === 'expired') {
     statusBadge.className = 'badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 fs-8';
+  } else if (client.account_status === 'pending') {
+    statusBadge.className = 'badge bg-secondary bg-opacity-30 text-secondary border border-secondary border-opacity-30 fs-8';
   } else {
     statusBadge.className = 'badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 fs-8';
   }
 
   const remainingDays = client.remaining_trial_days;
   const remainingBadge = document.getElementById('remainingDaysBadge');
-  remainingBadge.innerText = `${remainingDays} Days Left`;
-  if (remainingDays <= 3) {
-    remainingBadge.className = 'badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 fs-6 px-3 py-2';
-  } else if (remainingDays === 0 || client.account_status === 'expired') {
-    remainingBadge.innerText = 'Trial Expired';
-    remainingBadge.className = 'badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 fs-6 px-3 py-2';
+
+  // Update the trial banner based on account status
+  if (client.account_status === 'pending') {
+    // User has not started trial or purchased yet — show CTA options
+    if (trialBanner) {
+      trialBanner.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+          <div>
+            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 fs-8 mb-2">No Active Plan</span>
+            <h4 class="fw-bold text-light mb-1">Get Started with WaToolcab</h4>
+            <p class="text-secondary fs-7 mb-0">You haven't activated a plan yet. Purchase a plan or start a 15-day free trial.</p>
+          </div>
+          <div class="d-flex flex-column gap-2">
+            <button id="btnStartFreeTrial" class="btn btn-sm btn-outline-info px-4 py-2 fw-semibold rounded-pill">
+              <i class="bi bi-hourglass-split me-1"></i> Start 15-Day Free Trial
+            </button>
+            <a href="/pricing" class="btn btn-sm btn-success btn-success-glow px-4 py-2 fw-semibold rounded-pill">
+              <i class="bi bi-credit-card me-1"></i> View Plans & Purchase
+            </a>
+          </div>
+        </div>
+      `;
+      // Bind Start Trial button
+      const btnStartTrial = document.getElementById('btnStartFreeTrial');
+      if (btnStartTrial) {
+        btnStartTrial.onclick = activateFreeTrial;
+      }
+    }
+    if (remainingBadge) {
+      remainingBadge.innerText = 'No Plan';
+      remainingBadge.className = 'badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-30 fs-6 px-3 py-2';
+    }
+  } else if (client.account_status === 'trial') {
+    if (trialBanner) {
+      trialBanner.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-8 mb-2">15-Day Free Trial Active</span>
+            <h4 class="fw-bold text-light mb-1">Trial Status &amp; Validity</h4>
+            <p class="text-secondary fs-7 mb-0">Trial Expiry Date: <strong id="trialExpiryDateText" class="text-light">${client.trial_expiry_date || 'N/A'}</strong></p>
+          </div>
+          <div class="text-end">
+            <span id="remainingDaysBadge" class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-6 px-3 py-2">${remainingDays} Days Left</span>
+            <div class="mt-2 fs-8 text-secondary">Status: <span id="accountStatusBadge" class="badge bg-info">TRIAL</span></div>
+          </div>
+        </div>
+      `;
+    }
+    if (remainingBadge) {
+      remainingBadge.innerText = `${remainingDays} Days Left`;
+      if (remainingDays <= 3) {
+        remainingBadge.className = 'badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 fs-6 px-3 py-2';
+      } else {
+        remainingBadge.className = 'badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-6 px-3 py-2';
+      }
+    }
+  } else if (client.account_status === 'active') {
+    if (trialBanner) {
+      trialBanner.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-8 mb-2">Paid Plan Active</span>
+            <h4 class="fw-bold text-light mb-1">Account Status</h4>
+            <p class="text-secondary fs-7 mb-0">Plan: <strong class="text-success">${(client.current_plan || 'Paid').toUpperCase()}</strong> &nbsp;·&nbsp; Valid for 1 year from purchase.</p>
+          </div>
+          <div class="text-end">
+            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-6 px-3 py-2"><i class="bi bi-check-circle-fill me-1"></i> Active</span>
+          </div>
+        </div>
+      `;
+    }
+    if (remainingBadge) remainingBadge.innerText = 'Active';
+  } else {
+    // expired / frozen states
+    if (remainingBadge) {
+      remainingBadge.innerText = 'Trial Expired';
+      remainingBadge.className = 'badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 fs-6 px-3 py-2';
+    }
   }
 
   // Handle Account Freezing & Repurchase Modal
@@ -1350,17 +1448,15 @@ function setupEventListeners() {
     landingContactForm.onsubmit = handleContactSubmit;
   }
 
-  // Bind pricing card "Get Started" buttons
-  document.querySelectorAll('.btn-pricing-select').forEach(btn => {
-    btn.onclick = () => {
-      openLoginOverlay();
-    };
-  });
-
   // Check URL query parameters for plan pre-selection or direct sign-in triggers
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has('plan') || window.location.hash === '#login') {
+  if (urlParams.has('plan') || urlParams.get('start_trial') === '1' || window.location.hash === '#login') {
     if (!state.token) {
+      if (urlParams.has('plan')) {
+        sessionStorage.setItem('wa_pending_plan', urlParams.get('plan'));
+      } else if (urlParams.get('start_trial') === '1') {
+        sessionStorage.setItem('wa_pending_action', 'start_trial');
+      }
       openLoginOverlay();
     }
   }
@@ -1978,10 +2074,23 @@ document.addEventListener('click', (e) => {
     e.preventDefault();
     const plan = checkoutBtn.getAttribute('data-plan') || 'starter';
     if (!state.token) {
-      // Prompt user to sign in first, then resume plan purchase
+      // Store plan in session for post-login redirect
+      sessionStorage.setItem('wa_pending_plan', plan);
       openLoginOverlay();
     } else {
+      // Always go directly to Razorpay — no trial check, no bypass
       initiateRazorpayCheckout(plan);
+    }
+  }
+
+  const trialBtn = e.target.closest('.btn-start-trial, #btnHeroTrial');
+  if (trialBtn) {
+    e.preventDefault();
+    if (!state.token) {
+      sessionStorage.setItem('wa_pending_action', 'start_trial');
+      openLoginOverlay();
+    } else {
+      activateFreeTrial();
     }
   }
 
@@ -1990,3 +2099,36 @@ document.addEventListener('click', (e) => {
   }
 });
 
+/**
+ * Activates the 15-day free trial for the current logged-in user (pending status only)
+ */
+async function activateFreeTrial() {
+  const btn = document.getElementById('btnStartFreeTrial');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Activating Trial...';
+  }
+  try {
+    const res = await fetch('/api/client/start-trial', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${state.token}` }
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      alert('🎉 ' + data.message);
+      await fetchClientDashboardData();
+    } else {
+      alert('Could not activate trial: ' + (data.reason || 'Please try again.'));
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Start 15-Day Free Trial';
+      }
+    }
+  } catch (err) {
+    alert('Network error: ' + err.message);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Start 15-Day Free Trial';
+    }
+  }
+}

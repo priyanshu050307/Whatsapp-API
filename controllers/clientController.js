@@ -32,8 +32,10 @@ exports.getDashboard = async (req, res) => {
     const remainingDays = Math.max(0, Math.ceil((expiry - now) / (1000 * 60 * 60 * 24)));
 
     // Auto-detect freeze condition: credits <= 0 OR plan expiry date in past
-    let accountStatus = tenant.account_status || 'trial';
-    if (balance && balance.remaining_credits <= 0 && accountStatus !== 'suspended') {
+    let accountStatus = tenant.account_status || 'pending';
+    if (accountStatus === 'pending') {
+      // User has not started a trial or purchased yet - no freeze needed
+    } else if (balance && balance.remaining_credits <= 0 && accountStatus !== 'suspended' && accountStatus !== 'pending') {
       accountStatus = 'frozen_credits';
     } else if (tenant.plan_status === 'paid' && tenant.plan_expiry_date && new Date(tenant.plan_expiry_date) < now && accountStatus !== 'suspended') {
       accountStatus = 'frozen_expired';
@@ -56,12 +58,12 @@ exports.getDashboard = async (req, res) => {
         name: tenant.name || tenant.username,
         picture: tenant.picture,
         signup_date: tenant.signup_date || tenant.created_at,
-        trial_start_date: tenant.trial_start_date || tenant.signup_date,
-        trial_expiry_date: tenant.trial_expiry_date,
-        remaining_trial_days: remainingDays,
+        trial_start_date: tenant.trial_start_date || null,
+        trial_expiry_date: tenant.trial_expiry_date || null,
+        remaining_trial_days: accountStatus === 'pending' ? null : remainingDays,
         account_status: accountStatus,
-        plan_status: tenant.plan_status || 'free_trial',
-        current_plan: tenant.current_plan || 'trial',
+        plan_status: tenant.plan_status || (accountStatus === 'pending' ? 'no_plan' : 'free_trial'),
+        current_plan: tenant.current_plan || (accountStatus === 'pending' ? 'none' : 'trial'),
         plan_expiry_date: tenant.plan_expiry_date || null,
         is_frozen: isFrozen,
         api_credentials: {
@@ -145,4 +147,41 @@ exports.deleteAccount = async (req, res) => {
     });
   }
 };
+/**
+ * POST /api/client/start-trial
+ * Activates the 15-day free trial for a tenant currently in 'pending' state.
+ * This endpoint only works once — if the tenant is already on a trial or paid plan, it returns an error.
+ */
+exports.startTrial = async (req, res) => {
+  const tenant = req.tenant;
+  const tenantId = tenant.tenant_id;
 
+  if (tenant.account_status !== 'pending') {
+    return res.status(400).json({
+      status: 'failed',
+      reason: tenant.account_status === 'trial'
+        ? 'Your 15-day free trial is already active.'
+        : 'Free trial cannot be started for your current account status. Please purchase a plan.'
+    });
+  }
+
+  try {
+    const success = await db.startTrial(tenantId);
+    if (success) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Your 15-day free trial has been activated successfully! Start sending WhatsApp messages now.'
+      });
+    } else {
+      return res.status(500).json({
+        status: 'failed',
+        reason: 'Failed to activate free trial. Please try again or contact support.'
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({
+      status: 'failed',
+      reason: err.message || 'Error activating free trial'
+    });
+  }
+};

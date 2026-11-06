@@ -488,12 +488,12 @@ function addTenant(tenantId, username, password, channelId, options = {}) {
   const accountStatus = options.accountStatus || 'trial';
   const planStatus = options.planStatus || 'free_trial';
   const signupDate = options.signupDate || timestamp;
-  const trialStartDate = options.trialStartDate || timestamp;
+  const trialStartDate = options.trialStartDate !== undefined ? options.trialStartDate : timestamp;
   
   // 15 days trial expiry default
   const trialDays = options.trialDays || config.get().DEFAULT_TRIAL_DAYS || 15;
   const expiryDateObj = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
-  const trialExpiryDate = options.trialExpiryDate || expiryDateObj.toISOString().replace('T', ' ').substring(0, 19);
+  const trialExpiryDate = options.trialExpiryDate !== undefined ? options.trialExpiryDate : expiryDateObj.toISOString().replace('T', ' ').substring(0, 19);
   const lastLoginAt = options.lastLoginAt || timestamp;
   const isAdmin = options.isAdmin ? 1 : 0;
 
@@ -581,19 +581,53 @@ function createGoogleTenant(googleData) {
   const password = crypto.randomBytes(8).toString('hex');
   const channelId = String(crypto.randomInt(10000000, 100000000));
 
+  // New users start in 'pending' state — trial only begins when they explicitly click "Start Free Trial"
   return addTenant(tenantId, username, password, channelId, {
     email,
     name,
     googleId,
     picture,
-    accountStatus: 'trial',
-    planStatus: 'free_trial',
+    accountStatus: 'pending',
+    planStatus: 'no_plan',
+    trialStartDate: null,
+    trialExpiryDate: null,
     starterCredits: 100
   }).then(success => {
     if (success) {
       return getTenantById(tenantId);
     }
     return null;
+  });
+}
+
+/**
+ * Activates the 15-day free trial for a tenant who is in 'pending' state.
+ * Called when the user explicitly clicks "Start 15-Day Free Trial".
+ */
+function startTrial(tenantId) {
+  if (!sqliteAvailable || !db) return Promise.resolve(false);
+
+  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const trialDays = config.get().DEFAULT_TRIAL_DAYS || 15;
+  const expiryDateObj = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+  const trialExpiryDate = expiryDateObj.toISOString().replace('T', ' ').substring(0, 19);
+
+  return new Promise((resolve) => {
+    db.run(
+      `UPDATE tenants
+       SET account_status = 'trial', plan_status = 'free_trial',
+           trial_start_date = ?, trial_expiry_date = ?
+       WHERE tenant_id = ? AND account_status = 'pending'`,
+      [timestamp, trialExpiryDate, tenantId],
+      function(err) {
+        if (err) {
+          logger.error('Failed to start trial for tenant %s: %s', tenantId, err.message);
+          resolve(false);
+        } else {
+          resolve(this.changes > 0);
+        }
+      }
+    );
   });
 }
 
@@ -1209,6 +1243,7 @@ module.exports = {
   updateTenantLogin,
   updateTenantStatus,
   updateTrialExpiry,
+  startTrial,
   getTenantByCredentials,
   getTenantById,
   getAllTenants,
