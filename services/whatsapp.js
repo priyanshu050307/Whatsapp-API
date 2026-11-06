@@ -314,6 +314,8 @@ function initClient(tenantId) {
         '--disable-blink-features=AutomationControlled',
         '--disable-features=IsolateOrigins,site-per-process',
         '--disable-site-isolation-trials',
+        '--renderer-process-limit=2',
+        '--js-flags="--max-old-space-size=512"',
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
       ]
     }
@@ -820,21 +822,39 @@ async function sendMessageToChat(tenantId, chatId, body, file = null) {
   }
 
   let response;
-  if (file) {
-    const base64Data = file.buffer.toString('base64');
-    const media = new MessageMedia(file.mimetype, base64Data, file.originalname);
-    const isPdf = (file.mimetype && file.mimetype.includes('pdf')) || 
-                  (file.originalname && file.originalname.toLowerCase().endsWith('.pdf'));
-    const isDocument = isPdf || !(file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')));
-    const sendOptions = {
-      sendMediaAsDocument: isDocument
-    };
-    if (body) {
-      sendOptions.caption = body;
+  try {
+    if (file) {
+      const base64Data = file.buffer.toString('base64');
+      const media = new MessageMedia(file.mimetype, base64Data, file.originalname);
+      const isPdf = (file.mimetype && file.mimetype.includes('pdf')) || 
+                    (file.originalname && file.originalname.toLowerCase().endsWith('.pdf'));
+      const isDocument = isPdf || !(file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')));
+      const sendOptions = {
+        sendMediaAsDocument: isDocument
+      };
+      if (body) {
+        sendOptions.caption = body;
+      }
+      response = await session.client.sendMessage(formattedChatId, media, sendOptions);
+    } else {
+      response = await session.client.sendMessage(formattedChatId, body);
     }
-    response = await session.client.sendMessage(formattedChatId, media, sendOptions);
-  } else {
-    response = await session.client.sendMessage(formattedChatId, body);
+  } catch (sendErr) {
+    const isDetached = sendErr.message && (
+      sendErr.message.includes('detached Frame') ||
+      sendErr.message.includes('Execution context was destroyed') ||
+      sendErr.message.includes('Session closed') ||
+      sendErr.message.includes('Target closed')
+    );
+    if (isDetached) {
+      logger.warn(`[Tenant: ${tenantId}] Puppeteer frame detached during chat send (${sendErr.message}). Initiating auto-recovery restart...`);
+      setTimeout(() => {
+        restartClient(tenantId).catch(rErr => {
+          logger.error(`[Tenant: ${tenantId}] Direct send auto-recovery restart failed: %s`, rErr.message);
+        });
+      }, 1000);
+    }
+    throw sendErr;
   }
 
   const msgId = (response && response.id) 
@@ -1001,6 +1021,21 @@ async function triggerQueueProcessor(tenantId) {
           session.sendingQueue.shift();
 
           logger.error(`[Tenant: ${tenantId}] Failed to send background message to ${task.to}: %s`, err.message);
+
+          const isDetached = err.message && (
+            err.message.includes('detached Frame') ||
+            err.message.includes('Execution context was destroyed') ||
+            err.message.includes('Session closed') ||
+            err.message.includes('Target closed')
+          );
+          if (isDetached) {
+            logger.warn(`[Tenant: ${tenantId}] Puppeteer frame detached during queue send (${err.message}). Initiating auto-recovery restart...`);
+            setTimeout(() => {
+              restartClient(tenantId).catch(rErr => {
+                logger.error(`[Tenant: ${tenantId}] Queue send auto-recovery restart failed: %s`, rErr.message);
+              });
+            }, 1000);
+          }
           
           // Log failure (update existing log or create new one)
           if (task.logId) {
