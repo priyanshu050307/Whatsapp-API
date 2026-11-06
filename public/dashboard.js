@@ -583,32 +583,12 @@ function renderClientDashboard(data) {
 
   // 15-Day Trial & Plan Status Banner
   const trialBanner = document.getElementById('trialStatusBanner');
-  const trialExpiryEl = document.getElementById('trialExpiryDateText');
-  if (trialExpiryEl) trialExpiryEl.innerText = client.trial_expiry_date || 'N/A';
-  
-  const statusBadge = document.getElementById('accountStatusBadge');
-  statusBadge.innerText = (client.account_status || 'pending').toUpperCase();
-  if (client.account_status === 'trial') {
-    statusBadge.className = 'badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 fs-8';
-  } else if (client.account_status === 'active') {
-    statusBadge.className = 'badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-8';
-  } else if (client.account_status === 'expired') {
-    statusBadge.className = 'badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 fs-8';
-  } else if (client.account_status === 'pending') {
-    statusBadge.className = 'badge bg-secondary bg-opacity-30 text-secondary border border-secondary border-opacity-30 fs-8';
-  } else {
-    statusBadge.className = 'badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 fs-8';
-  }
-
   const remainingDays = client.remaining_trial_days;
-  const remainingBadge = document.getElementById('remainingDaysBadge');
 
-  // Update the trial banner based on account status
-  if (client.account_status === 'pending') {
-    // User has not started trial or purchased yet — show CTA options
-    if (trialBanner) {
+  if (trialBanner) {
+    if (client.account_status === 'pending') {
       trialBanner.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 w-100">
           <div>
             <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 fs-8 mb-2">No Active Plan</span>
             <h4 class="fw-bold text-light mb-1">Get Started with WaToolcab</h4>
@@ -624,44 +604,30 @@ function renderClientDashboard(data) {
           </div>
         </div>
       `;
-      // Bind Start Trial button
       const btnStartTrial = document.getElementById('btnStartFreeTrial');
       if (btnStartTrial) {
         btnStartTrial.onclick = activateFreeTrial;
       }
-    }
-    if (remainingBadge) {
-      remainingBadge.innerText = 'No Plan';
-      remainingBadge.className = 'badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-30 fs-6 px-3 py-2';
-    }
-  } else if (client.account_status === 'trial') {
-    if (trialBanner) {
+    } else if (client.account_status === 'trial') {
+      const daysClass = remainingDays <= 3
+        ? 'bg-warning bg-opacity-20 text-warning border-warning'
+        : 'bg-success bg-opacity-20 text-success border-success';
       trialBanner.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex justify-content-between align-items-start w-100">
           <div>
             <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-8 mb-2">15-Day Free Trial Active</span>
             <h4 class="fw-bold text-light mb-1">Trial Status &amp; Validity</h4>
-            <p class="text-secondary fs-7 mb-0">Trial Expiry Date: <strong id="trialExpiryDateText" class="text-light">${client.trial_expiry_date || 'N/A'}</strong></p>
+            <p class="text-secondary fs-7 mb-0">Trial Expiry Date: <strong class="text-light">${client.trial_expiry_date || 'N/A'}</strong></p>
           </div>
           <div class="text-end">
-            <span id="remainingDaysBadge" class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-6 px-3 py-2">${remainingDays} Days Left</span>
-            <div class="mt-2 fs-8 text-secondary">Status: <span id="accountStatusBadge" class="badge bg-info">TRIAL</span></div>
+            <span class="badge ${daysClass} border border-opacity-30 fs-6 px-3 py-2">${remainingDays} Days Left</span>
+            <div class="mt-2 fs-8 text-secondary">Status: <span class="badge bg-info">TRIAL</span></div>
           </div>
         </div>
       `;
-    }
-    if (remainingBadge) {
-      remainingBadge.innerText = `${remainingDays} Days Left`;
-      if (remainingDays <= 3) {
-        remainingBadge.className = 'badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 fs-6 px-3 py-2';
-      } else {
-        remainingBadge.className = 'badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-6 px-3 py-2';
-      }
-    }
-  } else if (client.account_status === 'active') {
-    if (trialBanner) {
+    } else if (client.account_status === 'active') {
       trialBanner.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex justify-content-between align-items-start w-100">
           <div>
             <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 fs-8 mb-2">Paid Plan Active</span>
             <h4 class="fw-bold text-light mb-1">Account Status</h4>
@@ -672,13 +638,21 @@ function renderClientDashboard(data) {
           </div>
         </div>
       `;
-    }
-    if (remainingBadge) remainingBadge.innerText = 'Active';
-  } else {
-    // expired / frozen states
-    if (remainingBadge) {
-      remainingBadge.innerText = 'Trial Expired';
-      remainingBadge.className = 'badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 fs-6 px-3 py-2';
+    } else {
+      trialBanner.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start w-100">
+          <div>
+            <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 fs-8 mb-2">Plan Expired</span>
+            <h4 class="fw-bold text-light mb-1">Account Suspended / Expired</h4>
+            <p class="text-secondary fs-7 mb-0">Your trial or subscription plan has expired. Please upgrade or repurchase a plan.</p>
+          </div>
+          <div class="d-flex flex-column gap-2">
+            <a href="/pricing" class="btn btn-sm btn-warning px-4 py-2 fw-semibold rounded-pill">
+              <i class="bi bi-credit-card me-1"></i> Repurchase Plan
+            </a>
+          </div>
+        </div>
+      `;
     }
   }
 
@@ -690,19 +664,19 @@ function renderClientDashboard(data) {
   const statusText = document.getElementById('clientWaStatusText');
   const numberText = document.getElementById('clientWaNumberText');
 
-  statusText.innerText = wa.state;
+  if (statusText) statusText.innerText = wa.state;
   if (wa.state === 'READY') {
-    dot.className = 'status-indicator ready';
-    statusText.className = 'fw-bold mb-0 text-success';
-    numberText.innerText = wa.number ? `Linked: +${wa.number}` : 'WhatsApp Ready';
+    if (dot) dot.className = 'status-indicator ready';
+    if (statusText) statusText.className = 'fw-bold mb-0 text-success';
+    if (numberText) numberText.innerText = wa.number ? `Linked: +${wa.number}` : 'WhatsApp Ready';
   } else if (wa.state === 'CONNECTING' || wa.state === 'LOADING' || wa.state === 'AUTHENTICATING') {
-    dot.className = 'status-indicator connecting';
-    statusText.className = 'fw-bold mb-0 text-warning';
-    numberText.innerText = 'Connecting to WhatsApp Web...';
+    if (dot) dot.className = 'status-indicator connecting';
+    if (statusText) statusText.className = 'fw-bold mb-0 text-warning';
+    if (numberText) numberText.innerText = 'Connecting to WhatsApp Web...';
   } else {
-    dot.className = 'status-indicator disconnected';
-    statusText.className = 'fw-bold mb-0 text-danger';
-    numberText.innerText = 'Disconnected - Scan QR Code';
+    if (dot) dot.className = 'status-indicator disconnected';
+    if (statusText) statusText.className = 'fw-bold mb-0 text-danger';
+    if (numberText) numberText.innerText = 'Disconnected - Scan QR Code';
   }
 
   // QR Code Slot (Session tab & QR Overlay)
@@ -740,25 +714,41 @@ function renderClientDashboard(data) {
   }
 
   // Metadata Table
-  document.getElementById('metaWaNumber').innerText = wa.number ? `+${wa.number}` : '-';
-  document.getElementById('metaWaPushname').innerText = wa.pushname || '-';
-  document.getElementById('metaWaPlatform').innerText = wa.platform || '-';
-  document.getElementById('metaWaVersion').innerText = wa.wwebVersion || '-';
-  document.getElementById('metaTenantId').innerText = client.tenant_id;
+  const elMetaWaNumber = document.getElementById('metaWaNumber');
+  if (elMetaWaNumber) elMetaWaNumber.innerText = wa.number ? `+${wa.number}` : '-';
+  const elMetaWaPushname = document.getElementById('metaWaPushname');
+  if (elMetaWaPushname) elMetaWaPushname.innerText = wa.pushname || '-';
+  const elMetaWaPlatform = document.getElementById('metaWaPlatform');
+  if (elMetaWaPlatform) elMetaWaPlatform.innerText = wa.platform || '-';
+  const elMetaWaVersion = document.getElementById('metaWaVersion');
+  if (elMetaWaVersion) elMetaWaVersion.innerText = wa.wwebVersion || '-';
+  const elMetaTenantId = document.getElementById('metaTenantId');
+  if (elMetaTenantId) elMetaTenantId.innerText = client.tenant_id;
 
   // Credits Cards
-  document.getElementById('clientCreditsRemaining').innerText = credits.remaining;
-  document.getElementById('clientCreditsUsed').innerText = credits.used;
-  document.getElementById('clientCreditsAllocated').innerText = credits.allocated;
+  const elCreditsRemaining = document.getElementById('clientCreditsRemaining');
+  if (elCreditsRemaining) elCreditsRemaining.innerText = credits.remaining;
+  const elCreditsUsed = document.getElementById('clientCreditsUsed');
+  if (elCreditsUsed) elCreditsUsed.innerText = credits.used;
+  const elCreditsAllocated = document.getElementById('clientCreditsAllocated');
+  if (elCreditsAllocated) elCreditsAllocated.innerText = credits.allocated;
 
   // API Config Tab (Busy Software Credentials)
-  document.getElementById('apiUsernameCode').innerText = client.api_credentials.username;
-  document.getElementById('apiPasswordCode').innerText = client.api_credentials.password;
-  document.getElementById('apiChannelIdCode').innerText = client.api_credentials.channel_id;
+  if (client.api_credentials) {
+    const elUserCode = document.getElementById('apiUsernameCode');
+    if (elUserCode) elUserCode.innerText = client.api_credentials.username;
+    const elPassCode = document.getElementById('apiPasswordCode');
+    if (elPassCode) elPassCode.innerText = client.api_credentials.password;
+    const elChanCode = document.getElementById('apiChannelIdCode');
+    if (elChanCode) elChanCode.innerText = client.api_credentials.channel_id;
 
-  document.getElementById('urlUser').innerText = client.api_credentials.username;
-  document.getElementById('urlPass').innerText = client.api_credentials.password;
-  document.getElementById('urlChan').innerText = client.api_credentials.channel_id;
+    const elUrlUser = document.getElementById('urlUser');
+    if (elUrlUser) elUrlUser.innerText = client.api_credentials.username;
+    const elUrlPass = document.getElementById('urlPass');
+    if (elUrlPass) elUrlPass.innerText = client.api_credentials.password;
+    const elUrlChan = document.getElementById('urlChan');
+    if (elUrlChan) elUrlChan.innerText = client.api_credentials.channel_id;
+  }
 
   // Logs Table
   renderClientLogs(data.logs || []);
